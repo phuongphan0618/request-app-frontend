@@ -31,7 +31,7 @@ export default function ToolbarFilters({
     <div className={styles.toolbar}>
       {/* Department (PNL) Selector */}
       <div className={styles.formGroup} style={{ position: 'relative' }}>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' }}>
           <label style={{ margin: 0 }}>Phòng Ban (PNL)</label>
           <button
             className={`${styles.iconBtn}`}
@@ -75,7 +75,7 @@ export default function ToolbarFilters({
 
       {/* Domain Selector */}
       <div className={styles.formGroup} style={{ position: 'relative' }}>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' }}>
           <label style={{ margin: 0 }}>Domain</label>
           <button
             className={`${styles.iconBtn}`}
@@ -135,9 +135,9 @@ export default function ToolbarFilters({
       <button
         className={`${styles.btn} ${styles.btnPrimary}`}
         onClick={onAppAdd}
-        style={{ marginTop: '32px', height: 'fit-content' }}
+        style={{ marginTop: '20px', height: 'fit-content', padding: '0.5rem 1rem' }}
       >
-        ➕ Thêm Ứng dụng
+        + Thêm Ứng dụng
       </button>
     </div>
   );

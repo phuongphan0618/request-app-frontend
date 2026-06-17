@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useTheme } from '../../lib/useTheme';
 import { useRouter } from 'next/navigation';
 import styles from './Dashboard.module.css';
+import LoginBackground from '../../components/login/LoginBackground';
 
 const TABS = [
   { key: 'pending', label: 'Chưa xử lý' },
@@ -58,8 +59,7 @@ export default function DashboardPage() {
 
   return (
     <div className={`${styles.container} ${isDark ? '' : styles.lightTheme}`}>
-      <div className={styles.ambientBlob1} />
-      <div className={styles.ambientBlob2} />
+      <LoginBackground isDark={isDark} />
 
 
       {/* ── Navbar ── */}

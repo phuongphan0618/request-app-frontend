@@ -19,7 +19,7 @@ const TABS = [
     key: 'owner',
     label: 'Chủ sở hữu',
     group_name: 'owner',
-    desc: 'Người phụ trách quản lý ứng dụng',
+    desc: 'Người phụ trách quản lý truy cập ứng dụng',
   },
 ];
 

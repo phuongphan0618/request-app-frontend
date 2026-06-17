@@ -110,6 +110,21 @@ export default function DomainModals({
 
             <form onSubmit={onEditSubmit} className={styles.modalForm}>
               <div className={styles.formGroup}>
+                <label>Phòng Ban Trực Thuộc</label>
+                <select
+                  required
+                  value={editForm.department || ''}
+                  onChange={(e) => onEditFormChange({ ...editForm, department: e.target.value })}
+                  className={styles.select}
+                >
+                  <option value="">-- Chọn Phòng Ban --</option>
+                  {departments.map(d => (
+                    <option key={d.id} value={d.id}>{d.code} - {d.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className={styles.formGroup}>
                 <label>Tên Domain</label>
                 <input
                   type="text"

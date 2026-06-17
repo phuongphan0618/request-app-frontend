@@ -25,9 +25,11 @@ export default function LoginCard({ isDark, onToggleTheme }) {
       const data = await login(email, password);
       setSuccess(true);
       if (data.role === 'sub-admin') {
-        router.push('/apps');
+        router.push('/dashboard');
       } else if (data.role === 'owner') {
         router.push('/owner');
+      } else if (data.role === 'requester') {
+        router.push('/form');
       } else {
         router.push('/dashboard');
       }

@@ -126,6 +126,21 @@ export default function AppModals({
 
             <form onSubmit={onEditSubmit} className={styles.modalForm}>
               <div className={styles.formGroup}>
+                <label>Domain Trực Thuộc</label>
+                <select
+                  required
+                  value={editingItem.domain || ''}
+                  onChange={(e) => onEditingItemChange({ ...editingItem, domain: e.target.value })}
+                  className={styles.select}
+                >
+                  <option value="">-- Chọn Domain --</option>
+                  {domains.map(dm => (
+                    <option key={dm.id} value={dm.id}>{dm.department_code} / {dm.code} - {dm.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className={styles.formGroup}>
                 <label>Tên Ứng Dụng</label>
                 <input
                   type="text"
