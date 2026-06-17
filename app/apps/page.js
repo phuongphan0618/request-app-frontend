@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useTheme } from '../../lib/useTheme';
+import { useRouter } from 'next/navigation';
 import LoginBackground from '../../components/login/LoginBackground';
 import {
   checkBackendConnection,
   getDepartments, createDepartment, deleteDepartment, updateDepartment,
   getDomains, createDomain, deleteDomain, updateDomain,
   getApplications, createApplication, deleteApplication, updateApplication,
-  getUsers
+  getOwners
 } from '../../lib/api';
 import styles from './Admin.module.css';
 import ToolbarFilters from './components/ToolbarFilters';
@@ -15,9 +17,11 @@ import ApplicationsTable from './components/ApplicationsTable';
 import DeptModals from './components/modals/DeptModals';
 import DomainModals from './components/modals/DomainModals';
 import AppModals from './components/modals/AppModals';
+import AdminNav from '../../components/AdminNav';
 
 export default function AdminPage() {
-  const [isDark, setIsDark] = useState(true);
+  const router = useRouter();
+  const { isDark, toggleTheme } = useTheme();
   const [connMode, setConnMode] = useState({ connected: false, mode: 'Checking...' });
 
   // Data States
@@ -57,16 +61,16 @@ export default function AdminPage() {
       setConnMode(conn);
       
       try {
-        const [depts, allDomains, allApps, allUsers] = await Promise.all([
+        const [depts, allDomains, allApps, allOwners] = await Promise.all([
           getDepartments(),
           getDomains(),
           getApplications(),
-          getUsers()
+          getOwners()
         ]);
         setDepartments(depts);
         setDomains(allDomains);
         setApplications(allApps);
-        setOwners(allUsers);
+        setOwners(allOwners);
       } catch (err) {
         console.error("Lỗi khi load dữ liệu ban đầu:", err);
       }
@@ -283,16 +287,27 @@ export default function AdminPage() {
   return (
     <main className={`${styles.container} ${isDark ? '' : styles.lightTheme}`}>
       <LoginBackground isDark={isDark} />
+      <AdminNav current="/apps" />
 
       <div className={styles.panel}>
         
         {/* Header Section */}
         <div className={styles.headerBar}>
           <div className={styles.titleWrapper}>
+            <button
+              type="button"
+              className={styles.backBtn}
+              onClick={() => router.push('/dashboard')}
+              title="Quay lại"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
             <h1 className={styles.title}>Danh Sách</h1>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {/* Connection badge */}
             <div className={styles.connBadge}>
               <span className={`${styles.connDot} ${connMode.connected ? styles.connConnected : styles.connMock}`} />
@@ -302,7 +317,7 @@ export default function AdminPage() {
             {/* Light/Dark Toggle */}
             <button
               type="button"
-              onClick={() => setIsDark(!isDark)}
+              onClick={toggleTheme}
               className={styles.themeToggle}
               aria-label="Toggle Theme"
             >
