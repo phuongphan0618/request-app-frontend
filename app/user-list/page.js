@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '../../lib/useTheme';
-import { getUsers } from '../../lib/api';
+import { getUsers, deleteUser } from '../../lib/api';
 import LoginBackground from '../../components/login/LoginBackground';
 import AdminNav from '../../components/AdminNav';
 import styles from './UserList.module.css';
@@ -19,6 +19,8 @@ export default function UserListPage() {
   const [allUsers, setAllUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [confirmId, setConfirmId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     getUsers()
@@ -26,6 +28,21 @@ export default function UserListPage() {
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
+
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      await deleteUser(confirmId);
+      setAllUsers(prev => prev.filter(u => u.id !== confirmId));
+      setConfirmId(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  const confirmUser = allUsers.find(u => u.id === confirmId);
 
   const q = search.toLowerCase();
 
@@ -45,6 +62,26 @@ export default function UserListPage() {
     <main className={`${styles.container} ${isDark ? '' : styles.lightTheme}`}>
       <LoginBackground isDark={isDark} />
       <AdminNav current="/user-list" />
+
+      {/* ── Confirm Delete Modal ── */}
+      {confirmId && (
+        <div className={styles.modalOverlay} onClick={() => setConfirmId(null)}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
+            <h3 className={styles.modalTitle}>Xác nhận xóa tài khoản</h3>
+            <p className={styles.modalSub}>
+              <strong>{confirmUser?.last_name} {confirmUser?.first_name}</strong>
+              <span style={{ display: 'block', fontSize: '0.8rem', opacity: 0.7 }}>{confirmUser?.email}</span>
+            </p>
+            <p className={styles.modalWarn}>Hành động này không thể hoàn tác.</p>
+            <div className={styles.modalActions}>
+              <button className={styles.btnSecondary} onClick={() => setConfirmId(null)}>Hủy</button>
+              <button className={styles.btnDelete} disabled={deleting} onClick={handleDelete}>
+                {deleting ? '…' : 'Xóa'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className={styles.panel}>
         {/* Header */}
@@ -120,6 +157,14 @@ export default function UserListPage() {
                       {u.is_active ? '● Active' : '○ Inactive'}
                     </span>
                   </div>
+                  <button className={styles.deleteBtn} title="Xóa tài khoản" onClick={() => setConfirmId(u.id)}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6l-1 14H6L5 6"/>
+                      <path d="M10 11v6"/><path d="M14 11v6"/>
+                      <path d="M9 6V4h6v2"/>
+                    </svg>
+                  </button>
                 </div>
               ))}
             </div>
@@ -168,6 +213,14 @@ export default function UserListPage() {
                       </div>
                     )}
                   </div>
+                  <button className={styles.deleteBtn} title="Xóa tài khoản" onClick={() => setConfirmId(u.id)}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6l-1 14H6L5 6"/>
+                      <path d="M10 11v6"/><path d="M14 11v6"/>
+                      <path d="M9 6V4h6v2"/>
+                    </svg>
+                  </button>
                 </div>
               ))}
             </div>

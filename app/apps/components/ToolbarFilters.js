@@ -32,7 +32,7 @@ export default function ToolbarFilters({
       {/* Department (PNL) Selector */}
       <div className={styles.formGroup} style={{ position: 'relative' }}>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' }}>
-          <label style={{ margin: 0 }}>Phòng Ban (PNL)</label>
+          <label style={{ margin: 0 }}>PNL</label>
           <button
             className={`${styles.iconBtn}`}
             onClick={onDeptAdd}
@@ -81,7 +81,7 @@ export default function ToolbarFilters({
             className={`${styles.iconBtn}`}
             onClick={onDomainAdd}
             title="Thêm Domain"
-            disabled={!selectedDeptId}
+            /*disabled={!selectedDeptId} */
           >
             <span style={{ fontSize: '16px' }}>+</span>
           </button>
@@ -110,7 +110,6 @@ export default function ToolbarFilters({
           value={selectedDomainId}
           onChange={onDomainChange}
           className={styles.select}
-          disabled={!selectedDeptId && filteredDomainsList.length === 0}
         >
           <option value="">-- Tất cả Domain --</option>
           {filteredDomainsList.map(d => (

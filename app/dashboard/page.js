@@ -1,66 +1,176 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useTheme } from '../../lib/useTheme';
 import { useRouter } from 'next/navigation';
 import styles from './Dashboard.module.css';
 import LoginBackground from '../../components/login/LoginBackground';
+import { getAccessRequests, approveRequest, rejectRequest, clearTokens } from '../../lib/api';
 
 const TABS = [
-  { key: 'pending', label: 'Chưa xử lý' },
+  { key: 'pending',    label: 'Chưa xử lý' },
   { key: 'processing', label: 'Đang xử lý' },
-  { key: 'done', label: 'Đã xử lý' },
+  { key: 'done',       label: 'Đã xử lý' },
 ];
 
-const MOCK = {
-  pending: [
-    { id: 'REQ-001', name: 'Nguyễn Văn An', email: 'nvan@company.com', pnl: 'PNL-IT', domain: 'Hạ tầng mạng', apps: ['VPN', 'JIRA'], deadline: '20/06/2026', waitTime: '2 ngày' },
-    { id: 'REQ-002', name: 'Trần Thị Bình', email: 'ttbinh@company.com', pnl: 'PNL-HR', domain: 'Nhân sự', apps: ['SAP HR'], deadline: '22/06/2026', waitTime: '4 ngày' },
-    { id: 'REQ-003', name: 'Lê Minh Châu', email: 'lmchau@company.com', pnl: 'PNL-FIN', domain: 'Tài chính', apps: ['Oracle', 'Tableau'], deadline: '18/06/2026', waitTime: '6 ngày' },
-    { id: 'REQ-007', name: 'Ngô Thị Dung', email: 'ntdung@company.com', pnl: 'PNL-OPS', domain: 'Vận hành', apps: ['Monitoring'], deadline: '25/06/2026', waitTime: '1 ngày' },
-  ],
-  processing: [
-    { id: 'REQ-004', name: 'Phạm Quốc Dũng', email: 'pqdung@company.com', pnl: 'PNL-IT', domain: 'Bảo mật', apps: ['CyberArk'], deadline: '19/06/2026', waitTime: '1 ngày' },
-    { id: 'REQ-008', name: 'Đinh Văn Hải', email: 'dvhai@company.com', pnl: 'PNL-IT', domain: 'Hạ tầng mạng', apps: ['VPN', 'Cisco ISE'], deadline: '21/06/2026', waitTime: '3 ngày' },
-  ],
-  done: [
-    { id: 'REQ-005', name: 'Hoàng Thị Em', email: 'htem@company.com', pnl: 'PNL-OPS', domain: 'Vận hành', apps: ['Monitoring', 'Grafana'], deadline: '15/06/2026', waitTime: '3 ngày' },
-    { id: 'REQ-006', name: 'Vũ Đức Phong', email: 'vdphong@company.com', pnl: 'PNL-IT', domain: 'Hạ tầng mạng', apps: ['VPN'], deadline: '14/06/2026', waitTime: '5 ngày' },
-    { id: 'REQ-009', name: 'Bùi Thị Giang', email: 'btgiang@company.com', pnl: 'PNL-FIN', domain: 'Tài chính', apps: ['Oracle'], deadline: '12/06/2026', waitTime: '7 ngày' },
-  ],
-};
+const DONE_STATUSES = ['rejected_by_admin', 'completed', 'canceled'];
 
-const TOTAL = Object.values(MOCK).reduce((sum, arr) => sum + arr.length, 0);
-
-const RATIO = [
-  { label: 'Chưa xử lý', count: MOCK.pending.length, color: '#DE1A1A' },
-  { label: 'Đang xử lý', count: MOCK.processing.length, color: '#8B85C1' },
-  { label: 'Đã xử lý',   count: MOCK.done.length, color: '#2ecc71' },
-];
-
-function buildGradient() {
-  let cum = 0;
-  return RATIO.map(r => {
-    const start = cum;
-    cum += (r.count / TOTAL) * 100;
-    return `${r.color} ${start.toFixed(1)}% ${cum.toFixed(1)}%`;
-  }).join(', ');
+function norm(data) {
+  return Array.isArray(data) ? data : (data?.results ?? []);
 }
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function calcWaitDays(createdAt) {
+  const days = Math.floor((Date.now() - new Date(createdAt).getTime()) / 86400000);
+  if (days === 0) return 'Hôm nay';
+  return `${days} ngày`;
+}
+
+function sortRequests(requests, sortBy) {
+  return [...requests].sort((a, b) => {
+    if (sortBy === 'waitTime') return new Date(a.created_at) - new Date(b.created_at);
+    if (sortBy === 'deadline') {
+      if (!a.deadline && !b.deadline) return 0;
+      if (!a.deadline) return 1;
+      if (!b.deadline) return -1;
+      return new Date(a.deadline) - new Date(b.deadline);
+    }
+    return String(a.id).localeCompare(String(b.id));
+  });
+}
+
+const STATUS_INFO = {
+  rejected_by_admin: { label: 'Từ chối',    cls: 'statusRejected' },
+  completed:         { label: 'Hoàn thành', cls: 'statusCompleted' },
+  canceled:          { label: 'Đã hủy',     cls: 'statusCanceled' },
+};
 
 export default function DashboardPage() {
   const router = useRouter();
   const { isDark, toggleTheme } = useTheme();
-  const [activeTab, setActiveTab] = useState('pending');
-  const [sortBy, setSortBy] = useState('waitTime');
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [activeTab,   setActiveTab]   = useState('pending');
+  const [sortBy,      setSortBy]      = useState('waitTime');
+  const [drawerOpen,  setDrawerOpen]  = useState(false);
+  const [search,      setSearch]      = useState('');
 
-  const requests = MOCK[activeTab];
-  const tabLabel = { pending: 'pending', processing: 'in-progress', done: 'completed' }[activeTab];
+  const [allRequests, setAllRequests] = useState([]);
+  const [loading,     setLoading]     = useState(true);
+
+  const [rejectTarget, setRejectTarget] = useState(null);
+  const [rejectNote,   setRejectNote]   = useState('');
+  const [submitting,   setSubmitting]   = useState(false);
+  const [actionError,  setActionError]  = useState('');
+
+  const loadRequests = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await getAccessRequests();
+      setAllRequests(norm(data));
+    } catch {
+      setAllRequests([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadRequests(); }, [loadRequests]);
+
+  const byTab = {
+    pending:    allRequests.filter(r => r.status === 'pending_admin'),
+    processing: allRequests.filter(r => r.status === 'pending_owner'),
+    done:       allRequests.filter(r => DONE_STATUSES.includes(r.status)),
+  };
+
+  const searchLower = search.toLowerCase().trim();
+  const filtered = searchLower
+    ? byTab[activeTab].filter(r =>
+        r.requester_email?.toLowerCase().includes(searchLower) ||
+        r.requester_name?.toLowerCase().includes(searchLower)
+      )
+    : byTab[activeTab];
+
+  const requests = sortRequests(filtered, sortBy);
+  const total    = allRequests.length;
+
+  const RATIO = [
+    { label: 'Chưa xử lý', count: byTab.pending.length,    color: '#DE1A1A' },
+    { label: 'Đang xử lý', count: byTab.processing.length, color: '#8B85C1' },
+    { label: 'Đã xử lý',   count: byTab.done.length,       color: '#2ecc71' },
+  ];
+
+  function buildGradient() {
+    if (total === 0) return 'rgba(160,154,185,0.2) 0% 100%';
+    let cum = 0;
+    return RATIO.filter(r => r.count > 0).map(r => {
+      const start = cum;
+      cum += (r.count / total) * 100;
+      return `${r.color} ${start.toFixed(1)}% ${cum.toFixed(1)}%`;
+    }).join(', ');
+  }
+
+  async function handleApprove(req) {
+    setActionError('');
+    try {
+      await approveRequest(req.id);
+      loadRequests();
+    } catch (err) {
+      setActionError(err.message);
+    }
+  }
+
+  async function handleRejectSubmit() {
+    setSubmitting(true);
+    setActionError('');
+    try {
+      await rejectRequest(rejectTarget.id, rejectNote);
+      setRejectTarget(null);
+      setRejectNote('');
+      loadRequests();
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const tabColSpan = activeTab === 'pending' || activeTab === 'done' ? 7 : 6;
 
   return (
     <div className={`${styles.container} ${isDark ? '' : styles.lightTheme}`}>
       <LoginBackground isDark={isDark} />
 
+      {/* ── Reject Modal ── */}
+      {rejectTarget && (
+        <div className={styles.modalOverlay} onClick={() => { setRejectTarget(null); setRejectNote(''); setActionError(''); }}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
+            <h3 className={styles.modalTitle}>Từ chối yêu cầu</h3>
+            <p className={styles.modalSub}>#{rejectTarget.id} — {rejectTarget.requester_name || rejectTarget.requester_email}</p>
+            <textarea
+              className={styles.modalNote}
+              rows={3}
+              placeholder="Ghi chú lý do từ chối (tuỳ chọn)…"
+              value={rejectNote}
+              onChange={e => setRejectNote(e.target.value)}
+            />
+            {actionError && <p className={styles.modalError}>{actionError}</p>}
+            <div className={styles.modalActions}>
+              <button className={styles.btnSecondary} onClick={() => { setRejectTarget(null); setRejectNote(''); setActionError(''); }}>Hủy</button>
+              <button
+                className={`${styles.actionBtn} ${styles.rejectBtn}`}
+                style={{ padding: '6px 14px', fontSize: '0.82rem', width: 'auto', height: 'auto' }}
+                disabled={submitting}
+                onClick={handleRejectSubmit}
+              >
+                {submitting ? '…' : 'Xác nhận từ chối'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Navbar ── */}
       <nav className={styles.navbar}>
@@ -80,7 +190,13 @@ export default function DashboardPage() {
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
             </svg>
-            <input type="text" placeholder="Quick search..." className={styles.searchInput} />
+            <input
+              type="text"
+              placeholder="Tìm tên / email…"
+              className={styles.searchInput}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
           </div>
 
           <button className={styles.navIconBtn} title="Thông báo">
@@ -106,7 +222,6 @@ export default function DashboardPage() {
             )}
           </button>
 
-          {/* Settings icon → popover menu */}
           <div className={styles.settingsWrap}>
             {drawerOpen && <div className={styles.sideBackdrop} onClick={() => setDrawerOpen(false)} />}
             <button
@@ -120,7 +235,6 @@ export default function DashboardPage() {
               </svg>
             </button>
 
-            {/* Dropdown menu */}
             <div className={`${styles.sideDrawer} ${drawerOpen ? styles.sideDrawerOpen : ''}`}>
               <button className={styles.sideItem} onClick={() => { router.push('/apps'); setDrawerOpen(false); }}>
                 <span className={styles.sideIcon}>
@@ -157,7 +271,7 @@ export default function DashboardPage() {
 
               <div className={styles.sideDivider} />
 
-              <button className={styles.sideItem} onClick={() => router.push('/login')}>
+              <button className={styles.sideItem} onClick={() => { clearTokens(); router.push('/login'); }}>
                 <span className={styles.sideIcon}>
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -182,7 +296,7 @@ export default function DashboardPage() {
       {/* ── Content ── */}
       <div className={styles.content}>
 
-        {/* Left panel — request table */}
+        {/* Left panel */}
         <div className={styles.leftPanel}>
           <div className={styles.tabs}>
             {TABS.map(tab => (
@@ -192,19 +306,23 @@ export default function DashboardPage() {
                 onClick={() => setActiveTab(tab.key)}
               >
                 {tab.label}
-                <span className={styles.tabBadge}>{MOCK[tab.key].length}</span>
+                <span className={styles.tabBadge}>{byTab[tab.key].length}</span>
               </button>
             ))}
           </div>
 
+          {actionError && !rejectTarget && (
+            <div className={styles.actionError}>{actionError}</div>
+          )}
+
           <div className={styles.sortBar}>
             <select className={styles.sortSelect} value={sortBy} onChange={e => setSortBy(e.target.value)}>
-              <option value="waitTime">Sort: Wait Time</option>
+              <option value="waitTime">Sort: Thời gian chờ</option>
               <option value="deadline">Sort: Deadline</option>
               <option value="id">Sort: Request ID</option>
             </select>
             <span className={styles.countText}>
-              Showing <strong>{requests.length}</strong> {tabLabel} requests
+              Hiển thị <strong>{requests.length}</strong> / {byTab[activeTab].length} yêu cầu
             </span>
           </div>
 
@@ -217,41 +335,71 @@ export default function DashboardPage() {
                   <th>PNL / Domain</th>
                   <th>Applications</th>
                   <th>Deadline</th>
-                  <th>Wait Time</th>
+                  <th>Thời gian chờ</th>
                   {activeTab === 'pending' && <th style={{ width: '72px' }}>Thao tác</th>}
+                  {activeTab === 'done'    && <th style={{ width: '90px' }}>Trạng thái</th>}
                 </tr>
               </thead>
               <tbody>
-                {requests.length === 0 ? (
-                  <tr><td colSpan="7" className={styles.emptyState}>Không có yêu cầu nào.</td></tr>
+                {loading ? (
+                  <tr><td colSpan={tabColSpan} className={styles.loadingState}>Đang tải…</td></tr>
+                ) : requests.length === 0 ? (
+                  <tr><td colSpan={tabColSpan} className={styles.emptyState}>Không có yêu cầu nào.</td></tr>
                 ) : requests.map(req => (
                   <tr key={req.id}>
                     <td><strong>{req.id}</strong></td>
                     <td>
                       <div className={styles.requesterCell}>
-                        <span>{req.name}</span>
-                        <span className={styles.subText}>{req.email}</span>
+                        <span>{req.requester_name || '—'}</span>
+                        <span className={styles.subText}>{req.requester_email}</span>
                       </div>
                     </td>
                     <td>
                       <div className={styles.pnlCell}>
-                        <span>{req.pnl}</span>
-                        <span className={styles.subText}>{req.domain}</span>
+                        <span>{req.department_names?.[0] ?? '—'}</span>
+                        <span className={styles.subText}>{req.domain_names?.[0] ?? '—'}</span>
                       </div>
                     </td>
                     <td>
                       <div className={styles.appTags}>
-                        {req.apps.map(app => <span key={app} className={styles.appTag}>{app}</span>)}
+                        {(req.app_names ?? []).slice(0, 3).map(app => (
+                          <span key={app} className={styles.appTag}>{app}</span>
+                        ))}
+                        {(req.app_names?.length ?? 0) > 3 && (
+                          <span className={styles.appTag} style={{ opacity: 0.6 }}>
+                            +{req.app_names.length - 3}
+                          </span>
+                        )}
                       </div>
                     </td>
-                    <td style={{ whiteSpace: 'nowrap' }}>{req.deadline}</td>
-                    <td><span className={styles.waitBadge}>{req.waitTime}</span></td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(req.deadline)}</td>
+                    <td><span className={styles.waitBadge}>{calcWaitDays(req.created_at)}</span></td>
                     {activeTab === 'pending' && (
                       <td>
                         <div className={styles.actionBtns}>
-                          <button className={`${styles.actionBtn} ${styles.approveBtn}`} title="Duyệt">✓</button>
-                          <button className={`${styles.actionBtn} ${styles.rejectBtn}`} title="Từ chối">✗</button>
+                          <button
+                            className={`${styles.actionBtn} ${styles.approveBtn}`}
+                            title="Duyệt"
+                            onClick={() => handleApprove(req)}
+                          >✓</button>
+                          <button
+                            className={`${styles.actionBtn} ${styles.rejectBtn}`}
+                            title="Từ chối"
+                            onClick={() => { setRejectTarget(req); setRejectNote(''); setActionError(''); }}
+                          >✗</button>
                         </div>
+                      </td>
+                    )}
+                    {activeTab === 'done' && (
+                      <td>
+                        {(() => {
+                          const info = STATUS_INFO[req.status] ?? { label: req.status, cls: 'statusCanceled' };
+                          return (
+                            <span className={`${styles.statusBadge} ${styles[info.cls]}`}>
+                              {info.label}
+                            </span>
+                          );
+                        })()}
                       </td>
                     )}
                   </tr>
@@ -275,7 +423,7 @@ export default function DashboardPage() {
             <div className={styles.donutWrap}>
               <div className={styles.donut} style={{ background: `conic-gradient(${buildGradient()})` }} />
               <div className={styles.donutCenter}>
-                <span className={styles.donutTotal}>{TOTAL}</span>
+                <span className={styles.donutTotal}>{total}</span>
                 <span className={styles.donutLabel}>Total</span>
               </div>
             </div>
@@ -285,7 +433,9 @@ export default function DashboardPage() {
                   <span className={styles.legendDot} style={{ background: r.color }} />
                   <span className={styles.legendLabel}>{r.label}</span>
                   <span className={styles.legendCount}>{r.count}</span>
-                  <span className={styles.legendPct}>{Math.round((r.count / TOTAL) * 100)}%</span>
+                  <span className={styles.legendPct}>
+                    {total > 0 ? Math.round((r.count / total) * 100) : 0}%
+                  </span>
                 </div>
               ))}
             </div>
@@ -302,10 +452,10 @@ export default function DashboardPage() {
             </div>
             <div className={styles.quickStats}>
               {[
-                { label: 'Cần xử lý', val: MOCK.pending.length, color: '#DE1A1A' },
-                { label: 'Đang xử lý', val: MOCK.processing.length, color: '#8B85C1' },
-                { label: 'Hoàn thành', val: MOCK.done.length, color: '#2ecc71' },
-                { label: 'Tổng cộng', val: TOTAL, color: null },
+                { label: 'Cần xử lý',  val: byTab.pending.length,    color: '#DE1A1A' },
+                { label: 'Đang xử lý', val: byTab.processing.length, color: '#8B85C1' },
+                { label: 'Hoàn thành', val: byTab.done.length,       color: '#2ecc71' },
+                { label: 'Tổng cộng',  val: total,                   color: null },
               ].map(s => (
                 <div key={s.label} className={styles.quickStat}>
                   <span className={styles.quickStatLabel}>{s.label}</span>

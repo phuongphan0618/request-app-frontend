@@ -19,6 +19,8 @@ import DomainModals from './components/modals/DomainModals';
 import AppModals from './components/modals/AppModals';
 import AdminNav from '../../components/AdminNav';
 
+const norm = d => Array.isArray(d) ? d : (d?.results ?? []);
+
 export default function AdminPage() {
   const router = useRouter();
   const { isDark, toggleTheme } = useTheme();
@@ -53,6 +55,7 @@ export default function AdminPage() {
   const [appModals, setAppModals] = useState({ create: false, edit: false });
   const [appForm, setAppForm] = useState({ name: '', code: '', description: '', domain: '', owner: '', is_active: true });
   const [editingApp, setEditingApp] = useState(null);
+  const [appDeleteId, setAppDeleteId] = useState(null);
 
   // 1. Initial Load & Backend Ping
   useEffect(() => {
@@ -67,10 +70,10 @@ export default function AdminPage() {
           getApplications(),
           getOwners()
         ]);
-        setDepartments(depts);
-        setDomains(allDomains);
-        setApplications(allApps);
-        setOwners(allOwners);
+        setDepartments(norm(depts));
+        setDomains(norm(allDomains));
+        setApplications(norm(allApps));
+        setOwners(norm(allOwners));
       } catch (err) {
         console.error("Lỗi khi load dữ liệu ban đầu:", err);
       }
@@ -80,8 +83,8 @@ export default function AdminPage() {
 
   // 2. Cascade Dropdown Filtering logic
   // Lấy các domain thuộc department được chọn
-  const filteredDomainsList = selectedDeptId 
-    ? domains.filter(d => d.department === Number(selectedDeptId))
+  const filteredDomainsList = selectedDeptId
+    ? domains.filter(d => String(d.department) === String(selectedDeptId))
     : domains;
 
   // Lọc danh sách app hiển thị trên bảng
@@ -89,12 +92,12 @@ export default function AdminPage() {
     // Lọc theo department (thông qua domain)
     if (selectedDeptId && !selectedDomainId) {
       const domainIdsInDept = domains
-        .filter(d => d.department === Number(selectedDeptId))
-        .map(d => d.id);
-      if (!domainIdsInDept.includes(app.domain)) return false;
+        .filter(d => String(d.department) === String(selectedDeptId))
+        .map(d => String(d.id));
+      if (!domainIdsInDept.includes(String(app.domain))) return false;
     }
     // Lọc theo domain
-    if (selectedDomainId && app.domain !== Number(selectedDomainId)) {
+    if (selectedDomainId && String(app.domain) !== String(selectedDomainId)) {
       return false;
     }
     // Lọc theo query search (tên app hoặc mã)
@@ -163,7 +166,7 @@ export default function AdminPage() {
     try {
       const res = await createDomain(domainForm);
       setDomains(prev => [...prev, res]);
-      setDepartments(prev => prev.map(d => d.id === Number(domainForm.department) ? { ...d, domain_count: (d.domain_count || 0) + 1 } : d));
+      setDepartments(prev => prev.map(d => d.id === domainForm.department ? { ...d, domain_count: (d.domain_count || 0) + 1 } : d));
       setDomainForm({ name: '', code: '', description: '', department: '' });
       setDomainModals({ create: false, edit: false });
     } catch (err) {
@@ -203,7 +206,7 @@ export default function AdminPage() {
     try {
       const res = await createApplication(appForm);
       setApplications(prev => [...prev, res]);
-      setDomains(prev => prev.map(dm => dm.id === Number(appForm.domain) ? { ...dm, application_count: (dm.application_count || 0) + 1 } : dm));
+      setDomains(prev => prev.map(dm => dm.id === appForm.domain ? { ...dm, application_count: (dm.application_count || 0) + 1 } : dm));
       setAppForm({ name: '', code: '', description: '', domain: '', owner: '', is_active: true });
       setAppModals({ create: false, edit: false });
     } catch (err) {
@@ -218,7 +221,15 @@ export default function AdminPage() {
     setErrorMsg('');
     setLoading(true);
     try {
-      const res = await updateApplication(editingApp.id, editingApp);
+      const payload = {
+        name: editingApp.name,
+        code: editingApp.code,
+        description: editingApp.description,
+        domain: editingApp.domain,
+        owner: editingApp.owner ? Number(editingApp.owner) : null,
+        is_active: editingApp.is_active,
+      };
+      const res = await updateApplication(editingApp.id, payload);
       setApplications(prev => prev.map(a => a.id === editingApp.id ? res : a));
       setAppModals({ create: false, edit: false });
       setEditingApp(null);
@@ -232,17 +243,20 @@ export default function AdminPage() {
   // ═══════════════════════════════════════════════
   // DELETE & TOGGLE HANDLERS
   // ═══════════════════════════════════════════════
-  const handleDeleteApp = async (appId) => {
-    if (!confirm('Bạn có chắc chắn muốn xóa Ứng dụng này không?')) return;
+  const handleDeleteApp = (appId) => setAppDeleteId(appId);
+
+  const handleConfirmDeleteApp = async () => {
     try {
-      await deleteApplication(appId);
-      const app = applications.find(a => a.id === appId);
-      setApplications(prev => prev.filter(a => a.id !== appId));
+      await deleteApplication(appDeleteId);
+      const app = applications.find(a => a.id === appDeleteId);
+      setApplications(prev => prev.filter(a => a.id !== appDeleteId));
       if (app) {
         setDomains(prev => prev.map(dm => dm.id === app.domain ? { ...dm, application_count: Math.max(0, (dm.application_count || 1) - 1) } : dm));
       }
     } catch (err) {
-      alert('Lỗi xóa App: ' + err.message);
+      setErrorMsg('Lỗi xóa App: ' + err.message);
+    } finally {
+      setAppDeleteId(null);
     }
   };
 
@@ -345,13 +359,15 @@ export default function AdminPage() {
           departments={departments}
           onDeptChange={handleDeptFilterChange}
           onDeptAdd={() => {
+            setErrorMsg('');
             setDeptForm({ name: '', code: '', description: '' });
             setDeptModals({ create: true, edit: false });
           }}
           onDeptEdit={() => {
             if (selectedDeptId) {
-              const dept = departments.find(d => d.id === Number(selectedDeptId));
+              const dept = departments.find(d => d.id === selectedDeptId);
               if (dept) {
+                setErrorMsg('');
                 setEditingDept(dept);
                 setDeptForm(dept);
                 setDeptModals({ create: false, edit: true });
@@ -360,7 +376,7 @@ export default function AdminPage() {
           }}
           onDeptDelete={() => {
             if (selectedDeptId && confirm('Xóa PNL này sẽ xóa tất cả Domain và Ứng dụng bên trong. Tiếp tục?')) {
-              handleDeleteDept(Number(selectedDeptId));
+              handleDeleteDept(selectedDeptId);
             }
           }}
 
@@ -368,13 +384,15 @@ export default function AdminPage() {
           filteredDomainsList={filteredDomainsList}
           onDomainChange={(e) => setSelectedDomainId(e.target.value)}
           onDomainAdd={() => {
+            setErrorMsg('');
             setDomainForm({ name: '', code: '', description: '', department: selectedDeptId });
             setDomainModals({ create: true, edit: false });
           }}
           onDomainEdit={() => {
             if (selectedDomainId) {
-              const domain = domains.find(d => d.id === Number(selectedDomainId));
+              const domain = domains.find(d => d.id === selectedDomainId);
               if (domain) {
+                setErrorMsg('');
                 setEditingDomain(domain);
                 setDomainForm(domain);
                 setDomainModals({ create: false, edit: true });
@@ -383,7 +401,7 @@ export default function AdminPage() {
           }}
           onDomainDelete={() => {
             if (selectedDomainId && confirm('Xóa Domain này sẽ xóa tất cả Ứng dụng bên trong. Tiếp tục?')) {
-              handleDeleteDomain(Number(selectedDomainId));
+              handleDeleteDomain(selectedDomainId);
             }
           }}
 
@@ -391,6 +409,7 @@ export default function AdminPage() {
           onSearchChange={(e) => setSearchQuery(e.target.value)}
 
           onAppAdd={() => {
+            setErrorMsg('');
             setAppForm({ name: '', code: '', description: '', domain: selectedDomainId, owner: '', is_active: true });
             setAppModals({ create: true, edit: false });
           }}
@@ -400,6 +419,7 @@ export default function AdminPage() {
         <ApplicationsTable
           displayApps={displayApps}
           onEdit={(app) => {
+            setErrorMsg('');
             setEditingApp({ ...app });
             setAppModals({ create: false, edit: true });
           }}
@@ -415,13 +435,13 @@ export default function AdminPage() {
 
       <DeptModals
         isCreateOpen={deptModals.create}
-        onCreateClose={() => setDeptModals({ create: false, edit: false })}
+        onCreateClose={() => { setErrorMsg(''); setDeptModals({ create: false, edit: false }); }}
         createForm={deptForm}
         onCreateFormChange={setDeptForm}
         onCreateSubmit={handleCreateDept}
 
         isEditOpen={deptModals.edit}
-        onEditClose={() => setDeptModals({ create: false, edit: false })}
+        onEditClose={() => { setErrorMsg(''); setDeptModals({ create: false, edit: false }); }}
         editingItem={editingDept}
         editForm={deptForm}
         onEditFormChange={setDeptForm}
@@ -433,13 +453,13 @@ export default function AdminPage() {
 
       <DomainModals
         isCreateOpen={domainModals.create}
-        onCreateClose={() => setDomainModals({ create: false, edit: false })}
+        onCreateClose={() => { setErrorMsg(''); setDomainModals({ create: false, edit: false }); }}
         createForm={domainForm}
         onCreateFormChange={setDomainForm}
         onCreateSubmit={handleCreateDomain}
 
         isEditOpen={domainModals.edit}
-        onEditClose={() => setDomainModals({ create: false, edit: false })}
+        onEditClose={() => { setErrorMsg(''); setDomainModals({ create: false, edit: false }); }}
         editingItem={editingDomain}
         editForm={domainForm}
         onEditFormChange={setDomainForm}
@@ -452,13 +472,13 @@ export default function AdminPage() {
 
       <AppModals
         isCreateOpen={appModals.create}
-        onCreateClose={() => setAppModals({ create: false, edit: false })}
+        onCreateClose={() => { setErrorMsg(''); setAppModals({ create: false, edit: false }); }}
         createForm={appForm}
         onCreateFormChange={setAppForm}
         onCreateSubmit={handleCreateApp}
 
         isEditOpen={appModals.edit}
-        onEditClose={() => setAppModals({ create: false, edit: false })}
+        onEditClose={() => { setErrorMsg(''); setAppModals({ create: false, edit: false }); }}
         editingItem={editingApp}
         onEditingItemChange={setEditingApp}
         onEditSubmit={handleUpdateApp}
@@ -469,6 +489,27 @@ export default function AdminPage() {
         errorMsg={errorMsg}
       />
 
+      {appDeleteId && (
+        <div className={styles.modalOverlay} onClick={() => setAppDeleteId(null)}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Xác nhận xóa ứng dụng</h2>
+              <button className={styles.modalClose} onClick={() => setAppDeleteId(null)}>&times;</button>
+            </div>
+            <p style={{ color: 'var(--text-secondary)', margin: '0 0 1.5rem' }}>
+              Bạn có chắc muốn xóa ứng dụng{' '}
+              <strong style={{ color: 'var(--text-primary)' }}>
+                {applications.find(a => a.id === appDeleteId)?.name}
+              </strong>
+              ? Hành động này không thể hoàn tác.
+            </p>
+            <div className={styles.modalFooter}>
+              <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setAppDeleteId(null)}>Hủy</button>
+              <button className={`${styles.btn} ${styles.btnDanger}`} onClick={handleConfirmDeleteApp}>Xóa</button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

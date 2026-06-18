@@ -402,3 +402,124 @@
   color: #ff6b6b;
   font-size: 0.8rem;
 }
+
+/* Delete button */
+.deleteBtn {
+  flex-shrink: 0;
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s;
+}
+
+.userRow:hover .deleteBtn {
+  opacity: 1;
+}
+
+.deleteBtn:hover {
+  background: rgba(222, 26, 26, 0.1);
+  border-color: rgba(222, 26, 26, 0.25);
+  color: #ff6060;
+}
+
+/* Modal */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal {
+  background: var(--card-bg);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 1.5rem 1.75rem;
+  width: 340px;
+  max-width: calc(100vw - 2rem);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.lightTheme .modal {
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 12px 40px rgba(122, 111, 155, 0.15);
+}
+
+.modalTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem;
+}
+
+.modalSub {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem;
+}
+
+.modalWarn {
+  font-size: 0.78rem;
+  color: #ff7070;
+  margin: 0 0 1.25rem;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btnSecondary {
+  background: transparent;
+  border: 1px solid var(--input-border);
+  color: var(--text-secondary);
+  padding: 6px 16px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btnSecondary:hover {
+  border-color: var(--color-purple-mid);
+  color: var(--text-primary);
+}
+
+.btnDelete {
+  background: rgba(222, 26, 26, 0.12);
+  border: 1px solid rgba(222, 26, 26, 0.3);
+  color: #ff5555;
+  padding: 6px 16px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btnDelete:hover {
+  background: rgba(222, 26, 26, 0.22);
+}
+
+.btnDelete:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
