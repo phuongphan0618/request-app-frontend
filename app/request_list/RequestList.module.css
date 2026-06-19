@@ -98,6 +98,7 @@
   border-bottom: 1px solid var(--input-border);
   transition: background 0.15s;
   border-radius: 8px;
+  cursor: pointer;
 }
 
 .row:last-child { border-bottom: none; }

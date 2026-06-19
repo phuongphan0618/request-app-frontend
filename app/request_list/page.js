@@ -45,9 +45,9 @@ export default function RequestListPage() {
     const q = search.toLowerCase();
     if (!q) return true;
     return (
-      r.app_names?.some(a => a.toLowerCase().includes(q)) ||
-      r.domain_names?.some(d => d.toLowerCase().includes(q)) ||
-      r.department_names?.some(d => d.toLowerCase().includes(q))
+      r.items?.some(item => item.application_name?.toLowerCase().includes(q)) ||
+      r.domain_name?.toLowerCase().includes(q) ||
+      r.department_name?.toLowerCase().includes(q)
     );
   });
 
@@ -145,7 +145,11 @@ export default function RequestListPage() {
             ) : filtered.map(r => {
               const { label, cls } = getStatusInfo(r.status);
               return (
-                <div key={r.id} className={styles.row}>
+                <div
+                  key={r.id}
+                  className={styles.row}
+                  onClick={() => router.push(`/request_details?id=${r.id}`)}
+                >
                   {/* ID + date */}
                   <div className={styles.rowId}>
                     <span className={styles.idText}>#{r.id}</span>
@@ -155,16 +159,16 @@ export default function RequestListPage() {
                   {/* Apps + meta */}
                   <div className={styles.rowInfo}>
                     <div className={styles.appList}>
-                      {r.app_names?.slice(0, 3).map(a => (
-                        <span key={a} className={shared.appTag}>{a}</span>
+                      {r.items?.slice(0, 3).map(item => (
+                        <span key={item.id} className={shared.appTag}>{item.application_name}</span>
                       ))}
-                      {r.app_names?.length > 3 && (
-                        <span className={`${shared.appTag} ${shared.appTagMore}`}>+{r.app_names.length - 3}</span>
+                      {r.items?.length > 3 && (
+                        <span className={`${shared.appTag} ${shared.appTagMore}`}>+{r.items.length - 3}</span>
                       )}
                     </div>
                     <div className={styles.metaList}>
-                      {r.department_names?.[0] && <span className={styles.metaChip}>{r.department_names[0]}</span>}
-                      {r.domain_names?.[0] && <span className={styles.metaChip}>{r.domain_names[0]}</span>}
+                      {r.department_name && <span className={styles.metaChip}>{r.department_name}</span>}
+                      {r.domain_name && <span className={styles.metaChip}>{r.domain_name}</span>}
                       {r.is_urgent && <span className={styles.urgentChip}>⚡ Gấp</span>}
                     </div>
                   </div>

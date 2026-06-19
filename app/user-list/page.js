@@ -202,16 +202,6 @@ export default function UserListPage() {
                     <span className={`${styles.statusBadge} ${u.is_active ? styles.statusActive : styles.statusInactive}`}>
                       {u.is_active ? '● Active' : '○ Inactive'}
                     </span>
-                    {u.app_names?.length > 0 && (
-                      <div className={styles.appTags}>
-                        {u.app_names.slice(0, 2).map(app => (
-                          <span key={app} className={styles.appTag}>{app}</span>
-                        ))}
-                        {u.app_names.length > 2 && (
-                          <span className={`${styles.appTag} ${styles.appTagMore}`}>+{u.app_names.length - 2}</span>
-                        )}
-                      </div>
-                    )}
                   </div>
                   <button className={styles.deleteBtn} title="Xóa tài khoản" onClick={() => setConfirmId(u.id)}>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

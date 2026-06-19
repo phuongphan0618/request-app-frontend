@@ -1,0 +1,308 @@
+/* ── Color Palette (shared with dashboard / requester screens) ── */
+:root {
+  --color-red: #DE1A1A;
+  --color-red-hover: #ff2a2a;
+  --color-purple-mid: #8B85C1;
+  --color-purple-light: #D4CDF4;
+  --color-charcoal: #111115;
+  --text-primary: #ffffff;
+  --text-secondary: #a09ab9;
+  --input-bg: rgba(122, 111, 155, 0.08);
+  --input-border: rgba(212, 205, 244, 0.12);
+  --card-bg: rgba(30, 30, 36, 0.65);
+  --card-border: rgba(222, 26, 26, 0.15);
+  --card-shadow: rgba(0, 0, 0, 0.4);
+  --table-row-hover: rgba(255, 255, 255, 0.02);
+}
+
+.lightTheme {
+  --color-charcoal: #F2F2F7;
+  --color-purple-light: #5A527A;
+  --text-primary: #1E1E24;
+  --text-secondary: #5A527A;
+  --input-bg: rgba(122, 111, 155, 0.04);
+  --input-border: rgba(122, 111, 155, 0.18);
+  --card-bg: rgba(255, 255, 255, 0.75);
+  --card-border: rgba(222, 26, 26, 0.12);
+  --card-shadow: rgba(122, 111, 155, 0.1);
+  --table-row-hover: rgba(0, 0, 0, 0.01);
+}
+
+/* ── Root ───────────────────────────────────────────────── */
+.container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-charcoal);
+  font-family: 'Outfit', 'Inter', -apple-system, sans-serif;
+  color: var(--text-primary);
+  transition: background-color 0.5s ease;
+  box-sizing: border-box;
+}
+
+/* ── Navbar ─────────────────────────────────────────────── */
+.navbar {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.75rem;
+  height: 54px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--input-border);
+  background: rgba(17, 17, 21, 0.75);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+.lightTheme .navbar {
+  background: rgba(242, 242, 247, 0.8);
+}
+
+.navLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.backBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--input-border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.backBtn:hover {
+  border-color: var(--color-red);
+  color: var(--color-red);
+  background: rgba(222, 26, 26, 0.08);
+}
+
+.navBrand {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-red);
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+}
+
+.navRight {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.navIconBtn {
+  background: transparent;
+  border: 1px solid var(--input-border);
+  color: var(--text-secondary);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.navIconBtn:hover {
+  border-color: var(--color-red);
+  color: var(--color-red);
+  background: rgba(222, 26, 26, 0.08);
+}
+
+/* ── Content ─────────────────────────────────────────────── */
+.content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  position: relative;
+  z-index: 10;
+  padding: 1.5rem;
+}
+
+.panel {
+  max-width: 880px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.card {
+  background: var(--card-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  box-shadow: 0 15px 35px var(--card-shadow);
+  padding: 1.25rem 1.5rem;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 0.9rem;
+}
+
+/* ── Title row ──────────────────────────────────────────── */
+.titleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.titleLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  margin: 0;
+}
+
+.urgentChip {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 5px;
+  background: rgba(255, 165, 0, 0.12);
+  color: #ffa500;
+  border: 1px solid rgba(255, 165, 0, 0.25);
+}
+
+/* ── Status badges ──────────────────────────────────────── */
+.statusBadge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 11px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.statusPending  { background: rgba(255, 165, 0, 0.12); color: #ffa500; border: 1px solid rgba(255, 165, 0, 0.25); }
+.statusRejected { background: rgba(222, 26, 26, 0.12); color: #ff6b6b; border: 1px solid rgba(222, 26, 26, 0.25); }
+.statusCompleted{ background: rgba(46, 204, 113, 0.12); color: #2ecc71; border: 1px solid rgba(46, 204, 113, 0.25); }
+.statusCanceled { background: var(--input-bg); color: var(--text-secondary); border: 1px solid var(--input-border); }
+
+/* ── Info grid ──────────────────────────────────────────── */
+.infoGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.infoBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.infoLabel {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.infoValue {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.infoValueSub {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+/* ── Items table ────────────────────────────────────────── */
+.itemsTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.itemsTable th {
+  text-align: left;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--input-border);
+}
+
+.itemsTable td {
+  padding: 0.6rem 0.7rem;
+  border-bottom: 1px solid var(--input-border);
+  color: var(--text-primary);
+  vertical-align: middle;
+}
+
+.itemsTable tr:last-child td {
+  border-bottom: none;
+}
+
+.itemsTable tr:hover td {
+  background: var(--table-row-hover);
+}
+
+.appCode {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+/* ── Misc states ────────────────────────────────────────── */
+.emptyState {
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.errorBanner {
+  margin-bottom: 0.85rem;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  background: rgba(222, 26, 26, 0.1);
+  border: 1px solid rgba(222, 26, 26, 0.25);
+  color: #ff6b6b;
+  font-size: 0.83rem;
+}
+
+.reasonText {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}

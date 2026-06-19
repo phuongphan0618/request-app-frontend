@@ -346,7 +346,11 @@ export default function DashboardPage() {
                 ) : requests.length === 0 ? (
                   <tr><td colSpan={tabColSpan} className={styles.emptyState}>Không có yêu cầu nào.</td></tr>
                 ) : requests.map(req => (
-                  <tr key={req.id}>
+                  <tr
+                    key={req.id}
+                    className={styles.clickableRow}
+                    onClick={() => router.push(`/request_details?id=${req.id}`)}
+                  >
                     <td><strong>{req.id}</strong></td>
                     <td>
                       <div className={styles.requesterCell}>
@@ -356,18 +360,18 @@ export default function DashboardPage() {
                     </td>
                     <td>
                       <div className={styles.pnlCell}>
-                        <span>{req.department_names?.[0] ?? '—'}</span>
-                        <span className={styles.subText}>{req.domain_names?.[0] ?? '—'}</span>
+                        <span>{req.department_name ?? '—'}</span>
+                        <span className={styles.subText}>{req.domain_name ?? '—'}</span>
                       </div>
                     </td>
                     <td>
                       <div className={styles.appTags}>
-                        {(req.app_names ?? []).slice(0, 3).map(app => (
-                          <span key={app} className={styles.appTag}>{app}</span>
+                        {(req.items ?? []).slice(0, 3).map(item => (
+                          <span key={item.id} className={styles.appTag}>{item.application_name}</span>
                         ))}
-                        {(req.app_names?.length ?? 0) > 3 && (
+                        {(req.items?.length ?? 0) > 3 && (
                           <span className={styles.appTag} style={{ opacity: 0.6 }}>
-                            +{req.app_names.length - 3}
+                            +{req.items.length - 3}
                           </span>
                         )}
                       </div>
@@ -380,12 +384,12 @@ export default function DashboardPage() {
                           <button
                             className={`${styles.actionBtn} ${styles.approveBtn}`}
                             title="Duyệt"
-                            onClick={() => handleApprove(req)}
+                            onClick={(e) => { e.stopPropagation(); handleApprove(req); }}
                           >✓</button>
                           <button
                             className={`${styles.actionBtn} ${styles.rejectBtn}`}
                             title="Từ chối"
-                            onClick={() => { setRejectTarget(req); setRejectNote(''); setActionError(''); }}
+                            onClick={(e) => { e.stopPropagation(); setRejectTarget(req); setRejectNote(''); setActionError(''); }}
                           >✗</button>
                         </div>
                       </td>

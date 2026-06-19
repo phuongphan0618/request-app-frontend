@@ -395,6 +395,10 @@
   background: var(--table-row-hover);
 }
 
+.clickableRow {
+  cursor: pointer;
+}
+
 .requesterCell,
 .pnlCell {
   display: flex;
