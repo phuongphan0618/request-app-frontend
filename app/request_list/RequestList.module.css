@@ -125,7 +125,7 @@
 }
 
 .dateText {
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   color: var(--text-secondary);
   white-space: nowrap;
 }
@@ -160,13 +160,14 @@
 }
 
 .urgentChip {
-  font-size: 0.68rem;
+  font-size: 0.78rem;
   font-weight: 700;
-  padding: 1px 7px;
-  border-radius: 4px;
+  padding: 3px 10px;
+  border-radius: 6px;
   background: rgba(255, 165, 0, 0.12);
   color: #ffa500;
   border: 1px solid rgba(255, 165, 0, 0.25);
+  white-space: nowrap;
 }
 
 .rowRight {

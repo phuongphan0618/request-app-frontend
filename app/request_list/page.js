@@ -13,6 +13,10 @@ function norm(data) {
   return Array.isArray(data) ? data : (data?.results ?? []);
 }
 
+function shortId(id) {
+  return typeof id === 'string' && id.length > 12 ? id.substring(0, 8) : id;
+}
+
 function fmtDate(iso) {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -31,12 +35,19 @@ function fmtDateTime(iso) {
   return new Date(iso).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-// Requester chỉ cần biết: đang chờ duyệt hoặc bị từ chối
 function getStatusInfo(status) {
-  if (status === 'rejected_by_admin') {
-    return { label: 'Bị từ chối', cls: 'statusRejected' };
+  switch (status) {
+    case 'rejected_by_admin':
+      return { label: 'Bị từ chối', cls: 'statusRejected' };
+    case 'approved':
+    case 'completed':
+      return { label: 'Đã hoàn thành', cls: 'statusCompleted' };
+    case 'canceled':
+    case 'cancelled':
+      return { label: 'Đã hủy', cls: 'statusCanceled' };
+    default:
+      return { label: 'Đang chờ duyệt', cls: 'statusPending' };
   }
-  return { label: 'Đang chờ duyệt', cls: 'statusPending' };
 }
 
 export default function RequestListPage() {
@@ -168,7 +179,7 @@ export default function RequestListPage() {
                 >
                   {/* ID + date */}
                   <div className={styles.rowId}>
-                    <span className={styles.idText}>#{r.id}</span>
+                    <span className={styles.idText} title={`#${r.id}`}>#{shortId(r.id)}</span>
                     <span className={styles.dateText}>{r.status === 'rejected_by_admin' ? fmtDateTime(r.reviewed_at) : calcWaitHours(r.created_at)}</span>
                   </div>
 

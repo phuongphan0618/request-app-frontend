@@ -4,7 +4,7 @@ import React, { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTheme } from '../../lib/useTheme';
 import { useAuthGuard } from '../../lib/useAuthGuard';
-import { getAccessRequestDetail, getMyRequestDetail, clearTokens } from '../../lib/api';
+import { getAccessRequestDetail, getMyRequestDetail, cancelMyRequest, disputeMyRequest, revertAccessRequest, clearTokens } from '../../lib/api';
 import LoginBackground from '../../components/login/LoginBackground';
 import shared from '../../components/requester/Requester.module.css';
 import styles from './RequestDetails.module.css';
@@ -44,6 +44,13 @@ function RequestDetailsContent() {
   const [request, setRequest] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [canceling, setCanceling] = useState(false);
+  const [reverting, setReverting] = useState(false);
+  const [disputing, setDisputing] = useState(false);
+  const [showRevertDialog, setShowRevertDialog] = useState(false);
+  const [showDisputeDialog, setShowDisputeDialog] = useState(false);
+  const [revertReason, setRevertReason] = useState('');
+  const [disputeReason, setDisputeReason] = useState('');
   const [role] = useState(() =>
     typeof window !== 'undefined' ? (localStorage.getItem('user_role') || '') : null
   );
@@ -62,7 +69,82 @@ function RequestDetailsContent() {
       .finally(() => setLoading(false));
   }, [id, role]);
 
+  const handleCancel = async () => {
+    if (!window.confirm('Bạn chắc chắn muốn hủy yêu cầu này?')) return;
+    setCanceling(true);
+    try {
+      await cancelMyRequest(id);
+      setRequest(prev => ({ ...prev, status: 'canceled' }));
+      setError('');
+    } catch (e) {
+      setError(e.message || 'Hủy yêu cầu thất bại');
+    } finally {
+      setCanceling(false);
+    }
+  };
+
+  const handleRevert = () => {
+    setRevertReason('');
+    setShowRevertDialog(true);
+  };
+
+  const handleRevertConfirm = async () => {
+    if (!revertReason.trim()) {
+      alert('Vui lòng nhập lý do hoàn tác');
+      return;
+    }
+    setReverting(true);
+    setShowRevertDialog(false);
+    try {
+      await revertAccessRequest(id, revertReason.trim());
+      await getAccessRequestDetail(id).then(setRequest);
+      setError('');
+      setRevertReason('');
+    } catch (e) {
+      setError(e.message || 'Hoàn tác yêu cầu thất bại');
+    } finally {
+      setReverting(false);
+    }
+  };
+
+  const handleRevertCancel = () => {
+    setShowRevertDialog(false);
+    setRevertReason('');
+  };
+
+  const handleDispute = () => {
+    setDisputeReason('');
+    setShowDisputeDialog(true);
+  };
+
+  const handleDisputeConfirm = async () => {
+    if (!disputeReason.trim()) {
+      alert('Vui lòng nhập lý do khiếu nại');
+      return;
+    }
+    setDisputing(true);
+    setShowDisputeDialog(false);
+    try {
+      await disputeMyRequest(id, disputeReason.trim());
+      await getMyRequestDetail(id).then(setRequest);
+      setError('');
+      setDisputeReason('');
+    } catch (e) {
+      setError(e.message || 'Khiếu nại yêu cầu thất bại');
+    } finally {
+      setDisputing(false);
+    }
+  };
+
+  const handleDisputeCancel = () => {
+    setShowDisputeDialog(false);
+    setDisputeReason('');
+  };
+
   const backHref = role === 'requester' ? '/request_list' : '/dashboard';
+  const canCancel = role === 'requester' && request && ['pending_admin', 'pending_owner'].includes(request.status);
+  const canRevert = (role === 'admin' || role === 'sub-admin') && request && ['pending_owner', 'rejected_by_admin'].includes(request.status);
+  const canDispute = role === 'requester' && request && request.status === 'rejected_by_admin';
 
   const { label, cls } = getStatusInfo(request?.status);
 
@@ -126,7 +208,39 @@ function RequestDetailsContent() {
                     <h1 className={styles.title}>Yêu cầu #{request.id}</h1>
                     {request.is_urgent && <span className={styles.urgentChip}>⚡ Gấp</span>}
                   </div>
-                  <span className={`${styles.statusBadge} ${styles[cls]}`}>{label}</span>
+                  <div className={styles.titleRight}>
+                    <span className={`${styles.statusBadge} ${styles[cls]}`}>{label}</span>
+                    {canCancel && (
+                      <button
+                        onClick={handleCancel}
+                        disabled={canceling}
+                        className={styles.cancelBtn}
+                        title="Hủy yêu cầu"
+                      >
+                        {canceling ? 'Đang hủy...' : 'Hủy yêu cầu'}
+                      </button>
+                    )}
+                    {canDispute && (
+                      <button
+                        onClick={handleDispute}
+                        disabled={disputing}
+                        className={styles.disputeBtn}
+                        title="Khiếu nại yêu cầu"
+                      >
+                        {disputing ? 'Đang khiếu nại...' : 'Khiếu nại'}
+                      </button>
+                    )}
+                    {canRevert && (
+                      <button
+                        onClick={handleRevert}
+                        disabled={reverting}
+                        className={styles.revertBtn}
+                        title="Hoàn tác yêu cầu"
+                      >
+                        {reverting ? 'Đang hoàn tác...' : 'Hoàn tác'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -257,6 +371,72 @@ function RequestDetailsContent() {
           )}
         </div>
       </div>
+
+      {/* Revert reason dialog */}
+      {showRevertDialog && (
+        <>
+          <div className={styles.dialogBackdrop} onClick={handleRevertCancel} />
+          <div className={styles.dialogBox}>
+            <h3 className={styles.dialogTitle}>Lý do hoàn tác</h3>
+            <textarea
+              className={styles.dialogInput}
+              placeholder="Nhập lý do hoàn tác yêu cầu..."
+              value={revertReason}
+              onChange={e => setRevertReason(e.target.value)}
+              rows={4}
+            />
+            <div className={styles.dialogActions}>
+              <button
+                className={styles.dialogBtnCancel}
+                onClick={handleRevertCancel}
+                disabled={reverting}
+              >
+                Hủy
+              </button>
+              <button
+                className={styles.dialogBtnConfirm}
+                onClick={handleRevertConfirm}
+                disabled={reverting || !revertReason.trim()}
+              >
+                {reverting ? 'Đang hoàn tác...' : 'Hoàn tác'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Dispute reason dialog */}
+      {showDisputeDialog && (
+        <>
+          <div className={styles.dialogBackdrop} onClick={handleDisputeCancel} />
+          <div className={styles.dialogBox}>
+            <h3 className={styles.dialogTitle}>Lý do khiếu nại</h3>
+            <textarea
+              className={styles.dialogInput}
+              placeholder="Nhập lý do khiếu nại yêu cầu..."
+              value={disputeReason}
+              onChange={e => setDisputeReason(e.target.value)}
+              rows={4}
+            />
+            <div className={styles.dialogActions}>
+              <button
+                className={styles.dialogBtnCancel}
+                onClick={handleDisputeCancel}
+                disabled={disputing}
+              >
+                Hủy
+              </button>
+              <button
+                className={styles.dialogBtnConfirm}
+                onClick={handleDisputeConfirm}
+                disabled={disputing || !disputeReason.trim()}
+              >
+                {disputing ? 'Đang khiếu nại...' : 'Khiếu nại'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

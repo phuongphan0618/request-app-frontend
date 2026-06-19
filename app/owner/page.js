@@ -12,6 +12,10 @@ function norm(data) {
   return Array.isArray(data) ? data : (data?.results ?? []);
 }
 
+function shortId(id) {
+  return typeof id === 'string' && id.length > 12 ? id.substring(0, 8) : id;
+}
+
 function fmtDateTime(iso) {
   if (!iso) return '—';
   return new Date(iso).toLocaleString('vi-VN', {
@@ -101,22 +105,26 @@ export default function OwnerPage() {
               <thead>
                 <tr>
                   <th>Batch ID</th>
+                  <th style={{ width: '55px' }}></th>
                   <th>Số item</th>
                   <th>Ngày gửi</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={3} className={styles.loadingState}>Đang tải…</td></tr>
+                  <tr><td colSpan={4} className={styles.loadingState}>Đang tải…</td></tr>
                 ) : batches.length === 0 ? (
-                  <tr><td colSpan={3} className={styles.emptyState}>Không có batch nào cần xử lý.</td></tr>
+                  <tr><td colSpan={4} className={styles.emptyState}>Không có batch nào cần xử lý.</td></tr>
                 ) : batches.map(b => (
                   <tr
                     key={b.id}
                     className={styles.clickableRow}
                     onClick={() => router.push(`/owner_batch_details?id=${b.id}`)}
                   >
-                    <td><strong>#{b.id}</strong></td>
+                    <td><strong title={`#${b.id}`}>#{shortId(b.id)}</strong></td>
+                    <td>
+                      {b.items?.some(item => item.is_urgent) && <span className={styles.urgentChip}>⚡ Gấp</span>}
+                    </td>
                     <td>{b.item_count ?? 0}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>{fmtDateTime(b.sent_at)}</td>
                   </tr>

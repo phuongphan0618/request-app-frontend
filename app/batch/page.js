@@ -12,6 +12,10 @@ function norm(data) {
   return Array.isArray(data) ? data : (data?.results ?? []);
 }
 
+function shortId(id) {
+  return typeof id === 'string' && id.length > 12 ? id.substring(0, 8) : id;
+}
+
 function fmtDateTime(iso) {
   if (!iso) return '—';
   return new Date(iso).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -187,6 +191,7 @@ export default function BatchPage() {
               <thead>
                 <tr>
                   <th>Batch ID</th>
+                  <th style={{ width: '55px' }}></th>
                   <th>Owner</th>
                   <th>Số lượng item</th>
                   <th>Trạng thái</th>
@@ -196,9 +201,9 @@ export default function BatchPage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={6} className={styles.loadingState}>Đang tải…</td></tr>
+                  <tr><td colSpan={7} className={styles.loadingState}>Đang tải…</td></tr>
                 ) : batches.length === 0 ? (
-                  <tr><td colSpan={6} className={styles.emptyState}>Không có batch nào.</td></tr>
+                  <tr><td colSpan={7} className={styles.emptyState}>Không có batch nào.</td></tr>
                 ) : batches.map(batch => {
                   const info = BATCH_STATUS_INFO[batch.status] ?? { label: batch.status, cls: 'statusPending' };
                   return (
@@ -207,7 +212,10 @@ export default function BatchPage() {
                       className={styles.clickableRow}
                       onClick={() => router.push(`/batch_details?id=${batch.id}`)}
                     >
-                      <td><strong>#{batch.id}</strong></td>
+                      <td><strong title={`#${batch.id}`}>#{shortId(batch.id)}</strong></td>
+                      <td>
+                        {batch.items?.some(item => item.is_urgent) && <span className={styles.urgentChip}>⚡ Gấp</span>}
+                      </td>
                       <td>{batch.owner_name ?? batch.owner_email ?? '—'}</td>
                       <td>{batch.item_count ?? '—'}</td>
                       <td>

@@ -220,6 +220,18 @@
   border: 1px solid rgba(222, 26, 26, 0.25);
 }
 
+.statusCompleted {
+  background: rgba(46, 204, 113, 0.12);
+  color: #2ecc71;
+  border: 1px solid rgba(46, 204, 113, 0.25);
+}
+
+.statusCanceled {
+  background: var(--input-bg);
+  color: var(--text-secondary);
+  border: 1px solid var(--input-border);
+}
+
 /* ── App tags ───────────────────────────────────────────── */
 .appTag {
   font-size: 0.72rem;

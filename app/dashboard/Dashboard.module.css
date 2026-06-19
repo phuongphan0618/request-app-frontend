@@ -431,10 +431,10 @@
 .waitBadge {
   background: rgba(222, 26, 26, 0.1);
   color: #ff7070;
-  font-size: 0.76rem;
+  font-size: 0.7rem;
   font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 6px;
+  padding: 2px 5px;
+  border-radius: 4px;
   white-space: nowrap;
 }
 
@@ -857,4 +857,15 @@
 .btnSecondary:hover {
   border-color: var(--color-purple-mid);
   color: var(--text-primary);
+}
+
+.urgentChip {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: rgba(255, 165, 0, 0.12);
+  color: #ffa500;
+  border: 1px solid rgba(255, 165, 0, 0.25);
+  white-space: nowrap;
 }

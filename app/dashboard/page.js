@@ -20,6 +20,10 @@ function norm(data) {
   return Array.isArray(data) ? data : (data?.results ?? []);
 }
 
+function shortId(id) {
+  return typeof id === 'string' && id.length > 12 ? id.substring(0, 8) : id;
+}
+
 function fmtDate(iso) {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -146,7 +150,7 @@ export default function DashboardPage() {
     }
   }
 
-  const tabColSpan = activeTab === 'pending' || activeTab === 'done' ? 7 : 6;
+  const tabColSpan = activeTab === 'pending' || activeTab === 'done' ? 8 : 7;
 
   if (!ready) return null;
   return (
@@ -340,6 +344,7 @@ export default function DashboardPage() {
               <thead>
                 <tr>
                   <th>Request ID</th>
+                  <th style={{ width: '55px' }}></th>
                   <th>Requester</th>
                   <th>PNL / Domain</th>
                   <th>Applications</th>
@@ -360,7 +365,10 @@ export default function DashboardPage() {
                     className={styles.clickableRow}
                     onClick={() => router.push(`/request_details?id=${req.id}`)}
                   >
-                    <td><strong>{req.id}</strong></td>
+                    <td><strong title={req.id}>{shortId(req.id)}</strong></td>
+                    <td>
+                      {req.is_urgent && <span className={styles.urgentChip}>⚡ Gấp</span>}
+                    </td>
                     <td>
                       <div className={styles.requesterCell}>
                         <span>{req.requester_name || '—'}</span>

@@ -180,6 +180,12 @@
   gap: 10px;
 }
 
+.titleRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .title {
   font-size: 1.25rem;
   font-weight: 700;
@@ -210,6 +216,75 @@
 .statusRejected { background: rgba(222, 26, 26, 0.12); color: #ff6b6b; border: 1px solid rgba(222, 26, 26, 0.25); }
 .statusCompleted{ background: rgba(46, 204, 113, 0.12); color: #2ecc71; border: 1px solid rgba(46, 204, 113, 0.25); }
 .statusCanceled { background: var(--input-bg); color: var(--text-secondary); border: 1px solid var(--input-border); }
+
+.cancelBtn {
+  background: rgba(222, 26, 26, 0.1);
+  border: 1px solid rgba(222, 26, 26, 0.25);
+  color: #ff6b6b;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.cancelBtn:hover:not(:disabled) {
+  background: rgba(222, 26, 26, 0.22);
+  border-color: rgba(222, 26, 26, 0.4);
+}
+
+.cancelBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.revertBtn {
+  background: rgba(255, 165, 0, 0.1);
+  border: 1px solid rgba(255, 165, 0, 0.25);
+  color: #ffa500;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.revertBtn:hover:not(:disabled) {
+  background: rgba(255, 165, 0, 0.22);
+  border-color: rgba(255, 165, 0, 0.4);
+}
+
+.revertBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.disputeBtn {
+  background: rgba(139, 133, 193, 0.1);
+  border: 1px solid rgba(139, 133, 193, 0.25);
+  color: #8B85C1;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.disputeBtn:hover:not(:disabled) {
+  background: rgba(139, 133, 193, 0.22);
+  border-color: rgba(139, 133, 193, 0.4);
+}
+
+.disputeBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 
 /* ── Info grid ──────────────────────────────────────────── */
 .infoGrid {
@@ -305,4 +380,118 @@
   color: var(--text-primary);
   line-height: 1.6;
   white-space: pre-wrap;
+}
+
+/* ── Dialog ─────────────────────────────────────────────── */
+.dialogBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 99;
+}
+
+.dialogBox {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 1.5rem;
+  max-width: 450px;
+  width: 90%;
+  z-index: 100;
+  box-shadow: 0 20px 60px var(--card-shadow);
+  animation: dialogSlideIn 0.2s ease;
+}
+
+@keyframes dialogSlideIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -55%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+.dialogTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 1rem 0;
+  letter-spacing: -0.3px;
+}
+
+.dialogInput {
+  width: 100%;
+  padding: 0.75rem;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.875rem;
+  resize: vertical;
+  margin-bottom: 1.25rem;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.dialogInput:focus {
+  outline: none;
+  border-color: var(--color-purple-mid);
+}
+
+.dialogInput::placeholder {
+  color: var(--text-secondary);
+}
+
+.dialogActions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.dialogBtnCancel,
+.dialogBtnConfirm {
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  border: 1px solid;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.dialogBtnCancel {
+  background: transparent;
+  border-color: var(--input-border);
+  color: var(--text-secondary);
+}
+
+.dialogBtnCancel:hover:not(:disabled) {
+  background: var(--input-bg);
+  color: var(--text-primary);
+}
+
+.dialogBtnConfirm {
+  background: rgba(255, 165, 0, 0.1);
+  border-color: rgba(255, 165, 0, 0.25);
+  color: #ffa500;
+}
+
+.dialogBtnConfirm:hover:not(:disabled) {
+  background: rgba(255, 165, 0, 0.22);
+  border-color: rgba(255, 165, 0, 0.4);
+}
+
+.dialogBtnCancel:disabled,
+.dialogBtnConfirm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
