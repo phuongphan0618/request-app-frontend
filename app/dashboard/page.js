@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTheme } from '../../lib/useTheme';
 import { useRouter } from 'next/navigation';
+import { useAuthGuard } from '../../lib/useAuthGuard';
 import styles from './Dashboard.module.css';
 import LoginBackground from '../../components/login/LoginBackground';
 import { getAccessRequests, approveRequest, rejectRequest, clearTokens } from '../../lib/api';
@@ -52,6 +53,7 @@ const STATUS_INFO = {
 export default function DashboardPage() {
   const router = useRouter();
   const { isDark, toggleTheme } = useTheme();
+  const ready = useAuthGuard('sub-admin');
   const [activeTab,   setActiveTab]   = useState('pending');
   const [sortBy,      setSortBy]      = useState('waitTime');
   const [drawerOpen,  setDrawerOpen]  = useState(false);
@@ -139,6 +141,7 @@ export default function DashboardPage() {
 
   const tabColSpan = activeTab === 'pending' || activeTab === 'done' ? 7 : 6;
 
+  if (!ready) return null;
   return (
     <div className={`${styles.container} ${isDark ? '' : styles.lightTheme}`}>
       <LoginBackground isDark={isDark} />

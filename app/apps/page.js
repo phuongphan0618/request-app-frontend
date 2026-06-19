@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../lib/useTheme';
 import { useRouter } from 'next/navigation';
+import { useAuthGuard } from '../../lib/useAuthGuard';
 import LoginBackground from '../../components/login/LoginBackground';
 import {
   checkBackendConnection,
@@ -24,6 +25,7 @@ const norm = d => Array.isArray(d) ? d : (d?.results ?? []);
 export default function AdminPage() {
   const router = useRouter();
   const { isDark, toggleTheme } = useTheme();
+  const ready = useAuthGuard('sub-admin');
   const [connMode, setConnMode] = useState({ connected: false, mode: 'Checking...' });
 
   // Data States
@@ -298,6 +300,7 @@ export default function AdminPage() {
     }
   };
 
+  if (!ready) return null;
   return (
     <main className={`${styles.container} ${isDark ? '' : styles.lightTheme}`}>
       <LoginBackground isDark={isDark} />

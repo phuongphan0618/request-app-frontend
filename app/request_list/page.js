@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '../../lib/useTheme';
+import { useAuthGuard } from '../../lib/useAuthGuard';
 import { getMyRequests, clearTokens } from '../../lib/api';
 import LoginBackground from '../../components/login/LoginBackground';
 import shared from '../../components/requester/Requester.module.css';
@@ -28,6 +29,7 @@ function getStatusInfo(status) {
 export default function RequestListPage() {
   const router = useRouter();
   const { isDark, toggleTheme } = useTheme();
+  const ready = useAuthGuard('requester');
 
   const [myRequests,  setMyRequests]  = useState([]);
   const [loading,     setLoading]     = useState(true);
@@ -51,6 +53,7 @@ export default function RequestListPage() {
     );
   });
 
+  if (!ready) return null;
   return (
     <div className={`${shared.container} ${isDark ? '' : shared.lightTheme}`}>
       <LoginBackground isDark={isDark} />

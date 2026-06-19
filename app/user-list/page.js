@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '../../lib/useTheme';
+import { useAuthGuard } from '../../lib/useAuthGuard';
 import { getUsers, deleteUser } from '../../lib/api';
 import LoginBackground from '../../components/login/LoginBackground';
 import AdminNav from '../../components/AdminNav';
@@ -15,6 +16,7 @@ function getInitials(first_name, last_name) {
 export default function UserListPage() {
   const router = useRouter();
   const { isDark, toggleTheme } = useTheme();
+  const ready = useAuthGuard('sub-admin');
   const [search, setSearch] = useState('');
   const [allUsers, setAllUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -58,6 +60,7 @@ export default function UserListPage() {
     u.email.toLowerCase().includes(q)
   );
 
+  if (!ready) return null;
   return (
     <main className={`${styles.container} ${isDark ? '' : styles.lightTheme}`}>
       <LoginBackground isDark={isDark} />

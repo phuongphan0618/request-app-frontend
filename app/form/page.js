@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '../../lib/useTheme';
+import { useAuthGuard } from '../../lib/useAuthGuard';
 import { getDepartments, getDomains, getApplications, createMyRequest, clearTokens } from '../../lib/api';
 import LoginBackground from '../../components/login/LoginBackground';
 import shared from '../../components/requester/Requester.module.css';
@@ -20,6 +21,7 @@ function fmtDate(str) {
 export default function FormPage() {
   const router = useRouter();
   const { isDark, toggleTheme } = useTheme();
+  const ready = useAuthGuard('requester');
 
   const [departments, setDepartments] = useState([]);
   const [domains,     setDomains]     = useState([]);
@@ -90,6 +92,7 @@ export default function FormPage() {
   const domainName = domains.find(d => String(d.id) === selDomain)?.name ?? '';
   const selAppObjs = apps.filter(a => selApps.includes(a.id));
 
+  if (!ready) return null;
   return (
     <div className={`${shared.container} ${isDark ? '' : shared.lightTheme}`}>
       <LoginBackground isDark={isDark} />

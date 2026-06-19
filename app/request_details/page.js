@@ -3,6 +3,7 @@
 import React, { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTheme } from '../../lib/useTheme';
+import { useAuthGuard } from '../../lib/useAuthGuard';
 import { getAccessRequestDetail, getMyRequestDetail, clearTokens } from '../../lib/api';
 import LoginBackground from '../../components/login/LoginBackground';
 import shared from '../../components/requester/Requester.module.css';
@@ -38,6 +39,7 @@ function RequestDetailsContent() {
   const searchParams = useSearchParams();
   const id = searchParams.get('id');
   const { isDark, toggleTheme } = useTheme();
+  const ready = useAuthGuard(null);
 
   const [request, setRequest] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -66,6 +68,7 @@ function RequestDetailsContent() {
 
   const { label, cls } = getStatusInfo(request?.status);
 
+  if (!ready) return null;
   return (
     <div className={`${shared.container} ${isDark ? '' : shared.lightTheme}`}>
       <LoginBackground isDark={isDark} />
