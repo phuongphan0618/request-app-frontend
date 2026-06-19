@@ -44,11 +44,9 @@ function RequestDetailsContent() {
   const [request, setRequest] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [role, setRole] = useState(null);
-
-  useEffect(() => {
-    setRole(localStorage.getItem('user_role') || '');
-  }, []);
+  const [role] = useState(() =>
+    typeof window !== 'undefined' ? (localStorage.getItem('user_role') || '') : null
+  );
 
   useEffect(() => {
     if (role === null) return;

@@ -25,10 +25,17 @@ function fmtDate(iso) {
   return new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-function calcWaitDays(createdAt) {
-  const days = Math.floor((Date.now() - new Date(createdAt).getTime()) / 86400000);
-  if (days === 0) return 'Hôm nay';
+function calcWaitHours(createdAt) {
+  const hours = Math.floor((Date.now() - new Date(createdAt).getTime()) / 3600000);
+  if (hours === 0) return 'Vừa gửi';
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
   return `${days} ngày`;
+}
+
+function fmtDateTime(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function sortRequests(requests, sortBy) {
@@ -183,8 +190,7 @@ export default function DashboardPage() {
           </span>
           <div className={styles.navLinks}>
             <button className={`${styles.navLink} ${styles.navLinkActive}`}>Dashboard</button>
-            <button className={styles.navLink}>Batch</button>
-            <button className={styles.navLink}>Request Details</button>
+            <button className={styles.navLink} onClick={() => router.push('/batch')}>Batch</button>
           </div>
         </div>
 
@@ -338,7 +344,7 @@ export default function DashboardPage() {
                   <th>PNL / Domain</th>
                   <th>Applications</th>
                   <th>Deadline</th>
-                  <th>Thời gian chờ</th>
+                  <th>{activeTab === 'done' ? 'Thời gian hoàn thành' : 'Thời gian chờ'}</th>
                   {activeTab === 'pending' && <th style={{ width: '72px' }}>Thao tác</th>}
                   {activeTab === 'done'    && <th style={{ width: '90px' }}>Trạng thái</th>}
                 </tr>
@@ -380,7 +386,7 @@ export default function DashboardPage() {
                       </div>
                     </td>
                     <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(req.deadline)}</td>
-                    <td><span className={styles.waitBadge}>{calcWaitDays(req.created_at)}</span></td>
+                    <td><span className={styles.waitBadge}>{activeTab === 'done' ? fmtDateTime(req.reviewed_at) : calcWaitHours(req.created_at)}</span></td>
                     {activeTab === 'pending' && (
                       <td>
                         <div className={styles.actionBtns}>

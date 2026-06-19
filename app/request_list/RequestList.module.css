@@ -107,16 +107,21 @@
 .rowId {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 3px;
   flex-shrink: 0;
-  width: 52px;
+  width: 96px;
+  min-width: 0;
 }
 
 .idText {
   font-size: 0.82rem;
   font-weight: 700;
   color: var(--color-purple-mid);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .dateText {

@@ -18,6 +18,19 @@ function fmtDate(iso) {
   return new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+function calcWaitHours(createdAt) {
+  const hours = Math.floor((Date.now() - new Date(createdAt).getTime()) / 3600000);
+  if (hours === 0) return 'Vừa gửi';
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `${days} ngày`;
+}
+
+function fmtDateTime(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 // Requester chỉ cần biết: đang chờ duyệt hoặc bị từ chối
 function getStatusInfo(status) {
   if (status === 'rejected_by_admin') {
@@ -156,7 +169,7 @@ export default function RequestListPage() {
                   {/* ID + date */}
                   <div className={styles.rowId}>
                     <span className={styles.idText}>#{r.id}</span>
-                    <span className={styles.dateText}>{fmtDate(r.created_at)}</span>
+                    <span className={styles.dateText}>{r.status === 'rejected_by_admin' ? fmtDateTime(r.reviewed_at) : calcWaitHours(r.created_at)}</span>
                   </div>
 
                   {/* Apps + meta */}
