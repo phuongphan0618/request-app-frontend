@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '../../lib/useTheme';
+import { getCurrentUser } from '../../lib/api';
 import LoginBackground from '../../components/login/LoginBackground';
 import styles from './App.module.css';
 
@@ -24,11 +25,21 @@ export default function LimeAppPage() {
   const router = useRouter();
   const { isDark, toggleTheme } = useTheme();
 
+  const [user, setUser] = useState(null);
   const [role, setRole]               = useState('admin');
   const [allRequests, setAllRequests] = useState(INITIAL_ALL_REQUESTS);
   const [queue, setQueue]             = useState([]);
   const [rejectTarget, setRejectTarget] = useState(null);
   const { toasts, push: pushToast }   = useToasts();
+
+  useEffect(() => {
+    const currentUser = getCurrentUser();
+    if (currentUser && currentUser.email) {
+      setUser(currentUser);
+    } else {
+      router.push('/');
+    }
+  }, [router]);
 
   const myRequests   = allRequests.filter(r => r.requester_email === MOCK_USER.email);
   const pendingAdmin = allRequests.filter(r => r.status === 'pending_admin').length;
@@ -113,13 +124,19 @@ export default function LimeAppPage() {
         </nav>
 
         <div className={styles.sidebarFooter}>
-          <div className={styles.userRow}>
-            <div className={styles.userAvatar}>{MOCK_USER.initials}</div>
-            <div className={styles.userInfo}>
-              <div className={styles.userName}>{MOCK_USER.name}</div>
-              <div className={styles.userEmail}>{MOCK_USER.email}</div>
+          {user ? (
+            <div className={styles.userRow}>
+              <div className={styles.userAvatar}>
+                {`${user.first_name?.charAt(0) || ''}${user.last_name?.charAt(0) || ''}`.toUpperCase()}
+              </div>
+              <div className={styles.userInfo}>
+                <div className={styles.userName}>
+                  {`${user.first_name || ''} ${user.last_name || ''}`.trim()}
+                </div>
+                <div className={styles.userEmail}>{user.email || ''}</div>
+              </div>
             </div>
-          </div>
+          ) : null}
           <div className={styles.footerBtns}>
             <button className={styles.footerBtn} onClick={() => router.push('/')}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>

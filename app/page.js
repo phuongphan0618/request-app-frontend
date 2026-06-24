@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '../lib/useTheme';
+import { login } from '../lib/api';
 import styles from './Login.module.css';
 
 function LimeBackground({ isDark }) {
@@ -47,7 +48,7 @@ export default function LimeLoginPage() {
   const [success, setSuccess]   = useState(false);
   const [error, setError]       = useState('');
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     if (!email || !password) {
       setError('Vui lòng nhập đầy đủ email và mật khẩu.');
@@ -55,10 +56,14 @@ export default function LimeLoginPage() {
     }
     setError('');
     setLoading(true);
-    setTimeout(() => {
+    try {
+      await login(email, password);
       setSuccess(true);
       setTimeout(() => router.push('/app'), 700);
-    }, 550);
+    } catch (err) {
+      setError(err.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
+      setLoading(false);
+    }
   }
 
   return (
@@ -122,7 +127,6 @@ export default function LimeLoginPage() {
           </button>
         </form>
 
-        <p className={styles.hint}>Demo UI — nhập bất kỳ thông tin nào để tiếp tục</p>
       </div>
     </div>
   );
