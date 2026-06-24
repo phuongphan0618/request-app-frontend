@@ -10,6 +10,7 @@ import styles from '../app/App.module.css';
 import { useToasts, ToastStack } from '../app/helpers';
 import { RejectReasonModal } from '../app/RejectReasonModal';
 import { TabAdmin } from '../app/TabAdmin';
+import { TabManage } from '../app/TabManage';
 import { BatchQueue } from '../app/BatchQueue';
 import { getAccessRequests } from '../../lib/api';
 
@@ -23,6 +24,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [queue, setQueue] = useState([]);
   const [rejectTarget, setRejectTarget] = useState(null);
+  const [adminView, setAdminView] = useState('requests'); // 'requests' | 'manage'
   const { toasts, push: pushToast } = useToasts();
 
   useEffect(() => {
@@ -253,8 +255,10 @@ export default function AdminPage() {
             <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-gray)' }}>
               Đang tải dữ liệu...
             </div>
+          ) : adminView === 'manage' ? (
+            <TabManage onBack={() => setAdminView('requests')} />
           ) : (
-            <TabAdmin requests={allRequests} queue={queue} onApprove={handleAdminApprove} onReject={handleAdminReject} />
+            <TabAdmin requests={allRequests} queue={queue} onApprove={handleAdminApprove} onReject={handleAdminReject} onManage={() => setAdminView('manage')} />
           )}
         </div>
       </main>

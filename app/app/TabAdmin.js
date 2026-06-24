@@ -215,7 +215,7 @@ function Pagination({ page, total, pageSize, onChange }) {
   );
 }
 
-export function TabAdmin({ requests, queue, onApprove, onReject }) {
+export function TabAdmin({ requests, queue, onApprove, onReject, onManage }) {
   const [sub, setSub]           = useState('pending');
   const [search, setSearch]     = useState('');
   const [selected, setSelected] = useState(null);
@@ -258,6 +258,9 @@ export function TabAdmin({ requests, queue, onApprove, onReject }) {
             <h2 className={styles.panelTitle}>Quản lý yêu cầu</h2>
             <p className={styles.panelDesc}>Duyệt yêu cầu → hệ thống gộp theo owner → gửi batch</p>
           </div>
+          <button className={styles.adminManageBtn} onClick={onManage}>
+            Quản lý
+          </button>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem', flexWrap: 'wrap' }}>

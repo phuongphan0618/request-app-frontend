@@ -334,6 +334,194 @@
 }
 .createBtn:hover { background: var(--color-red-hover); }
 
+/* ── Thin manage nav (red strip between sidebar and main) ── */
+.manageNav {
+  position: relative; z-index: 15;
+  width: 44px; flex-shrink: 0;
+  background: var(--color-red);
+  display: flex; flex-direction: column;
+  align-items: center;
+  padding-top: 1.25rem; gap: 2px;
+  border-right: 1px solid rgba(0,0,0,0.15);
+}
+
+.manageNavBtn {
+  width: 36px; padding: 12px 0;
+  background: transparent; border: none;
+  color: rgba(255,255,255,0.6);
+  font-family: inherit; font-size: 0.65rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.8px;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  cursor: pointer; border-radius: 6px;
+  transition: all 0.15s;
+}
+.manageNavBtn:hover { color: #fff; background: rgba(0,0,0,0.12); }
+.manageNavBtnActive { color: #fff !important; background: rgba(0,0,0,0.22) !important; }
+
+/* ── Admin header action button ── */
+.adminManageBtn {
+  display: flex; align-items: center; gap: 6px;
+  background: transparent; border: 1px solid var(--input-border);
+  color: var(--text-secondary); font-family: inherit; font-size: 0.8rem; font-weight: 600;
+  padding: 6px 14px; border-radius: 8px;
+  cursor: pointer; transition: all 0.15s;
+  white-space: nowrap; flex-shrink: 0;
+}
+.adminManageBtn:hover { border-color: var(--color-purple-mid); color: var(--text-primary); }
+
+/* ── Manage panel ── */
+.mgmtBackBtn {
+  width: 28px; height: 28px; flex-shrink: 0;
+  background: transparent; border: 1px solid var(--input-border);
+  color: var(--text-secondary); border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.15s;
+}
+.mgmtBackBtn:hover { border-color: var(--color-red); color: var(--color-red); }
+
+.mgmtTableWrap {
+  margin-top: 0.75rem;
+  border: 1px solid var(--input-border);
+  border-radius: 12px; overflow: hidden;
+  background: var(--card-bg);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+}
+
+.mgmtToolbar {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--input-border);
+  background: var(--input-bg);
+}
+
+.mgmtToolbarLabel {
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.4px; color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.mgmtCount {
+  font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap;
+}
+
+.mgmtAddIconBtn {
+  width: 24px; height: 24px; flex-shrink: 0;
+  background: transparent; border: 1px solid var(--input-border);
+  color: var(--text-secondary); border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.15s; font-family: inherit;
+}
+.mgmtAddIconBtn:hover { border-color: var(--color-red); color: var(--color-red); }
+
+.mgmtAddBtn {
+  display: flex; align-items: center; gap: 5px;
+  background: var(--color-red); border: none;
+  color: #fff; font-family: inherit; font-size: 0.8rem; font-weight: 600;
+  padding: 6px 12px; border-radius: 7px; cursor: pointer;
+  transition: background 0.15s; white-space: nowrap; flex-shrink: 0;
+}
+.mgmtAddBtn:hover { background: var(--color-red-hover); }
+
+.mgmtDomainChip {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 6px; border-radius: 5px;
+  background: rgba(139,133,193,0.12); color: var(--color-purple-mid);
+  font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; font-weight: 700;
+}
+.mgmtChipRemove {
+  background: none; border: none; color: inherit; cursor: pointer;
+  padding: 0; line-height: 1; font-size: 0.85rem; opacity: 0.6;
+}
+.mgmtChipRemove:hover { opacity: 1; }
+.mgmtChipEdit {
+  background: none; border: none; color: inherit; cursor: pointer;
+  padding: 0 2px; line-height: 1; opacity: 0.55;
+  display: inline-flex; align-items: center;
+}
+.mgmtChipEdit:hover { opacity: 1; }
+
+.mgmtIconBtn {
+  width: 28px; height: 28px;
+  background: transparent; border: 1px solid var(--input-border);
+  color: var(--text-secondary); border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.15s;
+}
+.mgmtIconBtn:hover { color: var(--color-purple-mid); border-color: var(--color-purple-mid); background: rgba(139,133,193,0.08); }
+.mgmtIconBtnDanger:hover { color: #ff6b6b; border-color: rgba(222,26,26,0.4); background: rgba(222,26,26,0.07); }
+
+.mgmtTable {
+  width: 100%; border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.mgmtTable th {
+  padding: 0.5rem 0.9rem;
+  text-align: left; font-weight: 600;
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.4px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--input-border);
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.mgmtTable td {
+  padding: 0.55rem 0.9rem;
+  border-bottom: 1px solid var(--input-border);
+  color: var(--text-primary); vertical-align: middle;
+  background: transparent;
+}
+
+.mgmtRow:last-child td { border-bottom: none; }
+.mgmtRow:hover td { background: var(--table-row-hover); }
+
+.mgmtBadge {
+  display: inline-flex; padding: 3px 8px;
+  border-radius: 6px; font-size: 0.75rem; font-weight: 600;
+}
+
+.mgmtDomainTag {
+  display: inline-block;
+  padding: 2px 7px; border-radius: 5px;
+  background: rgba(139,133,193,0.12); color: var(--color-purple-mid);
+  font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; font-weight: 700;
+}
+
+.mgmtAvatar {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(139,133,193,0.18);
+  color: var(--color-purple-mid); font-size: 0.7rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.mgmtEmpty {
+  padding: 2rem; text-align: center;
+  color: var(--text-secondary); font-style: italic; font-size: 0.85rem;
+}
+
+.mgmtPagination {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; border-top: 1px solid var(--input-border);
+  background: var(--input-bg);
+}
+
+.mgmtPageBtn {
+  min-width: 28px; height: 28px; padding: 0 5px;
+  border-radius: 6px; border: 1px solid var(--input-border);
+  background: transparent; color: var(--text-secondary);
+  cursor: pointer; font-size: 0.82rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: all 0.15s; font-family: inherit;
+}
+.mgmtPageBtn:hover:not(:disabled) { border-color: var(--color-purple-mid); color: var(--text-primary); }
+.mgmtPageBtn:disabled { opacity: 0.3; cursor: not-allowed; }
+.mgmtPageBtnActive {
+  background: var(--color-red); border-color: var(--color-red);
+  color: #fff; font-weight: 600;
+}
+.mgmtPageBtnActive:hover { background: var(--color-red) !important; color: #fff !important; }
+
 /* ── Sub-tabs ── */
 .subTabs { display: flex; gap: 3px; margin-bottom: 0.85rem; }
 
@@ -981,6 +1169,16 @@
 .formSelect:focus { border-color: var(--color-purple-mid); }
 .formSelect:disabled { opacity: 0.5; cursor: not-allowed; }
 .formSelect option { background: var(--color-charcoal); color: var(--text-primary); }
+
+.formInput {
+  padding: 0.55rem 0.8rem;
+  background: var(--input-bg); border: 1px solid var(--input-border);
+  border-radius: 8px; outline: none;
+  color: var(--text-primary); font-family: inherit; font-size: 0.83rem;
+  transition: border-color 0.15s; width: 100%; box-sizing: border-box;
+}
+.formInput:focus { border-color: var(--color-purple-mid); }
+.formInput::placeholder { color: var(--text-secondary); }
 
 .appsPlaceholder {
   padding: 0.8rem 1rem;
