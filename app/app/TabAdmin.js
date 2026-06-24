@@ -30,38 +30,36 @@ function RequestCard({ req, isQueued, isSelected, isDimmed, onClick, onApprove, 
       onClick={onClick}
     >
       <div className={styles.reqCardTop}>
-        <div className={styles.reqCardIdWrap}>
-          <span className={styles.reqCardId}>{req.id}</span>
-        </div>
-        <div className={styles.reqCardTopRight}>
-          {req.is_urgent && <ClockIcon />}
-          <span className={styles.reqCardDate}>{fmtDate(req.created_at)}</span>
-        </div>
+        <span className={styles.reqCardId}>{req.id}</span>
+        <span className={styles.reqCardDate}>{fmtDate(req.created_at)}</span>
       </div>
 
       <div className={styles.reqCardBody}>
-        <div className={styles.reqCardRow}>
-          <div className={styles.reqCardPerson}>
-            <span className={styles.reqCardName}>{req.requester_name}</span>
-            <span className={styles.reqCardEmail}>{req.requester_email}</span>
+        <span className={styles.reqCardName}>{req.requester_name}</span>
+        <span className={styles.reqCardEmail}>{req.requester_email}</span>
+
+        <div className={styles.reqCardSections}>
+          <div className={styles.reqCardSection}>
+            <span className={styles.reqCardLabel}>Domain</span>
+            <div className={styles.appTags}>
+              <span className={styles.appTag}>{req.domain_name}</span>
+            </div>
           </div>
-          <div className={styles.reqCardDeadline}>
-            Deadline:
-            <span className={styles.reqCardDeadlineVal}>{fmtDate(req.deadline)}</span>
+          <div className={styles.reqCardSection}>
+            <span className={styles.reqCardLabel}>App</span>
+            <div className={styles.appTags}>
+              {req.items.slice(0, 2).map(i => <span key={i.id} className={styles.appTag}>{i.application_name}</span>)}
+              {req.items.length > 2 && <span className={styles.appTag}>+{req.items.length - 2}</span>}
+            </div>
           </div>
         </div>
-        <div className={styles.reqCardSection}>
-          <span className={styles.reqCardLabel}>Domain</span>
-          <div className={styles.appTags}>
-            <span className={styles.appTag}>{req.domain_name}</span>
-          </div>
-        </div>
-        <div className={styles.reqCardSection}>
-          <span className={styles.reqCardLabel}>App</span>
-          <div className={styles.appTags}>
-            {req.items.slice(0, 2).map(i => <span key={i.id} className={styles.appTag}>{i.application_name}</span>)}
-            {req.items.length > 2 && <span className={styles.appTag}>+{req.items.length - 2}</span>}
-          </div>
+
+        <div className={`${styles.reqCardDeadlineRow} ${req.is_urgent ? styles.reqCardDeadlineUrgent : ''}`}>
+          <span className={styles.reqCardDeadlineLabel}>
+            {req.is_urgent && <ClockIcon />}
+            Deadline
+          </span>
+          <span className={styles.reqCardDeadlineVal}>{fmtDate(req.deadline)}</span>
         </div>
       </div>
 
@@ -203,10 +201,25 @@ const SUB_TABS = [
   { key: 'done',       label: 'Đã xử lý',   filter: r => r.status === 'completed' || r.status === 'rejected_by_admin' },
 ];
 
+const PAGE_SIZE = 8;
+
+function Pagination({ page, total, pageSize, onChange }) {
+  const totalPages = Math.ceil(total / pageSize);
+  if (totalPages <= 1) return null;
+  return (
+    <div className={styles.pagination}>
+      <button className={styles.pageBtn} disabled={page === 1} onClick={() => onChange(page - 1)}>‹</button>
+      <span className={styles.pageInfo}>{page} / {totalPages}</span>
+      <button className={styles.pageBtn} disabled={page === totalPages} onClick={() => onChange(page + 1)}>›</button>
+    </div>
+  );
+}
+
 export function TabAdmin({ requests, queue, onApprove, onReject }) {
   const [sub, setSub]           = useState('pending');
   const [search, setSearch]     = useState('');
   const [selected, setSelected] = useState(null);
+  const [page, setPage]         = useState(1);
 
   const queuedIds = new Set(queue.map(e => e.request.id));
   const byTab     = Object.fromEntries(SUB_TABS.map(t => [t.key, requests.filter(t.filter)]));
@@ -220,6 +233,8 @@ export function TabAdmin({ requests, queue, onApprove, onReject }) {
         r.items.some(i => i.application_name.toLowerCase().includes(searchLow))
       )
     : byTab[sub];
+
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   function handleSelectCard(req) {
     setSelected(p => p?.id === req.id ? null : req);
@@ -250,7 +265,7 @@ export function TabAdmin({ requests, queue, onApprove, onReject }) {
             {SUB_TABS.map(t => (
               <button key={t.key}
                 className={`${styles.subTab} ${sub === t.key ? styles.subTabActive : ''}`}
-                onClick={() => { setSub(t.key); setSelected(null); }}
+                onClick={() => { setSub(t.key); setSelected(null); setPage(1); }}
               >
                 {t.label}<span className={styles.subTabCount}>{byTab[t.key].length}</span>
               </button>
@@ -265,7 +280,7 @@ export function TabAdmin({ requests, queue, onApprove, onReject }) {
               className={styles.searchInput}
               placeholder="Tìm tên, email, app…"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => { setSearch(e.target.value); setPage(1); }}
             />
           </div>
         </div>
@@ -274,31 +289,37 @@ export function TabAdmin({ requests, queue, onApprove, onReject }) {
       {filtered.length === 0 ? (
         <div className={styles.emptyState}><div className={styles.emptyIcon}>✅</div>Không có yêu cầu nào.</div>
       ) : (
-        <div className={styles.cardGrid}>
-          {filtered.map(req => (
-            <RequestCard
-              key={req.id}
-              req={req}
-              isQueued={queuedIds.has(req.id)}
-              isSelected={selected?.id === req.id}
-              isDimmed={!!selected && selected.id !== req.id}
-              isPending={sub === 'pending'}
-              onClick={() => handleSelectCard(req)}
-              onApprove={handleApprove}
-              onReject={handleReject}
-            />
-          ))}
-        </div>
+        <>
+          <div className={styles.cardGrid}>
+            {paged.map(req => (
+              <RequestCard
+                key={req.id}
+                req={req}
+                isQueued={queuedIds.has(req.id)}
+                isSelected={selected?.id === req.id}
+                isDimmed={!!selected && selected.id !== req.id}
+                isPending={sub === 'pending'}
+                onClick={() => handleSelectCard(req)}
+                onApprove={handleApprove}
+                onReject={handleReject}
+              />
+            ))}
+          </div>
+          <Pagination page={page} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage} />
+        </>
       )}
 
       {selected && (
-        <DetailPanel
-          req={selected}
-          isQueued={queuedIds.has(selected.id)}
-          onClose={() => setSelected(null)}
-          onApprove={handleApprove}
-          onReject={handleReject}
-        />
+        <>
+          <div className={styles.dpOverlay} onClick={() => setSelected(null)} />
+          <DetailPanel
+            req={selected}
+            isQueued={queuedIds.has(selected.id)}
+            onClose={() => setSelected(null)}
+            onApprove={handleApprove}
+            onReject={handleReject}
+          />
+        </>
       )}
     </div>
   );

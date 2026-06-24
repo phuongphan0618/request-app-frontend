@@ -3,9 +3,10 @@
 import React, { useState } from 'react';
 import styles from './App.module.css';
 import { MOCK_CATALOG, MOCK_APP_OWNERS, MOCK_USER, genId } from './data';
-import { fmtDate } from './helpers';
+import { fmtDate, fmtDateTime, StatusBadge } from './helpers';
+import { ClockIcon } from './TabAdmin';
 
-// ── Progress stepper ──────────────────────────────────────────
+// ── Progress logic ────────────────────────────────────────────
 
 const STEPS = [
   { label: 'Tạo yêu cầu' },
@@ -14,47 +15,27 @@ const STEPS = [
   { label: 'Hoàn thành' },
 ];
 
-function getProgress(status) {
-  switch (status) {
-    case 'pending_admin':     return { activeStep: 1, failed: false };
-    case 'pending_owner':     return { activeStep: 2, failed: false };
-    case 'completed':         return { activeStep: 4, failed: false };
-    case 'rejected_by_admin': return { activeStep: 1, failed: true };
-    case 'rejected_by_owner': return { activeStep: 2, failed: true };
-    default:                  return { activeStep: 1, failed: false };
-  }
-}
-
 function stepState(idx, activeStep, failed) {
-  if (idx < activeStep)  return 'done';
+  if (idx < activeStep)   return 'done';
   if (idx === activeStep) return failed ? 'failed' : 'active';
   return 'pending';
 }
 
-const DOT_SM = { done: styles.dotSmDone, active: styles.dotSmActive, failed: styles.dotSmFailed, pending: styles.dotSmPending };
-const DOT    = { done: styles.dotDone,   active: styles.dotActive,   failed: styles.dotFailed,   pending: styles.dotPending };
-const LBL    = { done: styles.lblDone,   active: styles.lblActive,   failed: styles.lblFailed,   pending: styles.lblPending };
 
-function ProgressCompact({ status }) {
-  const { activeStep, failed } = getProgress(status);
-  return (
-    <div className={styles.progressCompact}>
-      {STEPS.map((_, i) => (
-        <React.Fragment key={i}>
-          <span className={`${styles.progressDotSm} ${DOT_SM[stepState(i, activeStep, failed)]}`} />
-          {i < STEPS.length - 1 && (
-            <span className={`${styles.progressLineSm} ${i < activeStep ? styles.progressLineSmDone : ''}`} />
-          )}
-        </React.Fragment>
-      ))}
-    </div>
-  );
+function getItemProgress(reqStatus, itemStatus) {
+  if (reqStatus === 'pending_admin')     return { activeStep: 1, failed: false };
+  if (reqStatus === 'rejected_by_admin') return { activeStep: 1, failed: true };
+  if (reqStatus === 'completed')         return { activeStep: 4, failed: false };
+  if (itemStatus === 'approved')         return { activeStep: 4, failed: false };
+  if (itemStatus === 'rejected_by_owner') return { activeStep: 2, failed: true };
+  return { activeStep: 2, failed: false };
 }
 
-function ProgressStepper({ status }) {
-  const { activeStep, failed } = getProgress(status);
-  const failLabel = status === 'rejected_by_admin' ? 'Bị từ chối' : status === 'rejected_by_owner' ? 'Owner từ chối' : null;
+const DOT = { done: styles.dotDone, active: styles.dotActive, failed: styles.dotFailed, pending: styles.dotPending };
+const LBL = { done: styles.lblDone, active: styles.lblActive, failed: styles.lblFailed, pending: styles.lblPending };
 
+
+function ProgressStepperCore({ activeStep, failed, failLabel }) {
   return (
     <div className={styles.progressStepper}>
       {STEPS.map((step, i) => {
@@ -85,6 +66,143 @@ function ProgressStepper({ status }) {
           </React.Fragment>
         );
       })}
+    </div>
+  );
+}
+
+function ItemProgressStepper({ reqStatus, itemStatus }) {
+  const { activeStep, failed } = getItemProgress(reqStatus, itemStatus ?? 'pending_owner');
+  const failLabel = reqStatus === 'rejected_by_admin' ? 'Bị từ chối' : 'Owner từ chối';
+  return <ProgressStepperCore activeStep={activeStep} failed={failed} failLabel={failLabel} />;
+}
+
+// ── Pagination ───────────────────────────────────────────────
+
+function Pagination({ page, total, pageSize, onChange }) {
+  const totalPages = Math.ceil(total / pageSize);
+  if (totalPages <= 1) return null;
+  return (
+    <div className={styles.pagination}>
+      <button className={styles.pageBtn} disabled={page === 1} onClick={() => onChange(page - 1)}>‹</button>
+      <span className={styles.pageInfo}>{page} / {totalPages}</span>
+      <button className={styles.pageBtn} disabled={page === totalPages} onClick={() => onChange(page + 1)}>›</button>
+    </div>
+  );
+}
+
+// ── Left card ─────────────────────────────────────────────────
+
+function ReqCard({ req, isSelected, onClick }) {
+  return (
+    <div
+      className={`${styles.reqSplitCard} ${isSelected ? styles.reqSplitCardSel : ''}`}
+      onClick={onClick}
+    >
+      <div className={styles.reqSplitCardTop}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span className={styles.reqSplitCardId}>{req.id}</span>
+          {req.is_urgent && <ClockIcon />}
+        </div>
+        <StatusBadge status={req.status} />
+      </div>
+      <div className={styles.reqSplitCardMeta}>
+        <span className={styles.reqSplitCardMetaLabel}>Domain</span>
+        <span className={styles.reqSplitCardMetaVal}>{req.domain_name}</span>
+      </div>
+      <div className={styles.appTags} style={{ marginTop: 10 }}>
+        {req.items.slice(0, 2).map(i => <span key={i.id} className={styles.appTag}>{i.application_name}</span>)}
+        {req.items.length > 2 && <span className={styles.appTag}>+{req.items.length - 2}</span>}
+      </div>
+      <div className={styles.reqSplitCardDeadlineRow}>
+        <span className={styles.reqSplitCardDeadlineLabel}>Deadline</span>
+        <span className={styles.reqSplitCardDeadlineVal}>{fmtDate(req.deadline) || '—'}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Right detail pane ─────────────────────────────────────────
+
+function ReqDetail({ req }) {
+  const canCancel = ['pending_admin', 'pending_owner'].includes(req.status);
+
+  return (
+    <div className={styles.reqDetailPane}>
+      {/* Header */}
+      <div className={styles.rdHeader}>
+        <div className={styles.rdHeaderLeft}>
+          <span className={styles.rdId}>{req.id}</span>
+          {req.is_urgent && <ClockIcon />}
+          <StatusBadge status={req.status} />
+        </div>
+        {canCancel && (
+          <button className={styles.rdCancelBtn}>Hủy yêu cầu</button>
+        )}
+      </div>
+
+      {/* Scrollable body */}
+      <div className={styles.rdBody}>
+
+        {/* Thông tin chung + Lý do — cùng hàng */}
+        <div className={`${styles.rdSection} ${styles.rdSectionRow}`}>
+          <div className={styles.rdSectionCol}>
+            <div className={styles.rdSectionTitle}>Thông tin chung</div>
+            <div className={styles.rdInfoGrid}>
+              <div className={styles.rdInfoBlock}>
+                <span className={styles.rdInfoLabel}>PNL</span>
+                <span className={styles.rdInfoValue}>{req.department_name}</span>
+              </div>
+              <div className={styles.rdInfoBlock}>
+                <span className={styles.rdInfoLabel}>Domain</span>
+                <span className={styles.rdInfoValue}>{req.domain_name}</span>
+              </div>
+              <div className={styles.rdInfoBlock}>
+                <span className={styles.rdInfoLabel}>Hạn xử lý</span>
+                <span className={styles.rdInfoValue}>{fmtDate(req.deadline) || '—'}</span>
+              </div>
+              <div className={styles.rdInfoBlock}>
+                <span className={styles.rdInfoLabel}>Ngày tạo</span>
+                <span className={styles.rdInfoValue}>{fmtDateTime(req.created_at)}</span>
+              </div>
+            </div>
+          </div>
+
+          {req.reason && (
+            <div className={`${styles.rdSectionCol} ${styles.rdSectionColDivider}`}>
+              <div className={styles.rdSectionTitle}>Lý do yêu cầu</div>
+              <p className={styles.rdReasonText}>{req.reason}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Ghi chú từ chối */}
+        {req.reject_note && (
+          <div className={styles.rdSection}>
+            <div className={styles.rdSectionTitle}>Ghi chú từ chối</div>
+            <p className={styles.rdRejectNote}>{req.reject_note}</p>
+          </div>
+        )}
+
+        {/* Danh sách ứng dụng với progress từng item */}
+        <div className={styles.rdSection}>
+          <div className={styles.rdSectionTitle}>Danh sách ứng dụng ({req.items.length})</div>
+          <div className={styles.rdItemList}>
+            {req.items.map(item => (
+              <div key={item.id} className={styles.rdItem}>
+                <div className={styles.rdItemHeader}>
+                  <span className={styles.rdItemApp}>{item.application_name}</span>
+                  <div className={styles.rdItemOwnerWrap}>
+                    <span className={styles.rdItemOwner}>{item.owner_name}</span>
+                    <span className={styles.rdItemOwnerEmail}>{item.owner_email}</span>
+                  </div>
+                </div>
+                <ItemProgressStepper reqStatus={req.status} itemStatus={item.status} />
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }
@@ -233,7 +351,7 @@ function CreateRequestModal({ onClose, onCreate }) {
               {isUrgent && (
                 <div className={styles.confirmRow}>
                   <span className={styles.confirmLabel}>Mức độ</span>
-                  <span style={{ color: 'var(--color-red)', fontWeight: 700, fontSize: '0.8rem' }}>⚡ Gấp</span>
+                  <ClockIcon />
                 </div>
               )}
             </div>
@@ -250,22 +368,20 @@ function CreateRequestModal({ onClose, onCreate }) {
 
 // ── Tab Requester ─────────────────────────────────────────────
 
+const PAGE_SIZE = 3;
+
 export function TabRequester({ myRequests, onCreate }) {
-  const [sub, setSub]               = useState('active');
-  const [showModal, setShowModal]   = useState(false);
-  const [expandedRows, setExpandedRows] = useState(new Set());
+  const [sub, setSub]             = useState('active');
+  const [showModal, setShowModal] = useState(false);
+  const [selected, setSelected]   = useState(null);
+  const [page, setPage]           = useState(1);
 
   const active = myRequests.filter(r => r.status === 'pending_admin' || r.status === 'pending_owner');
   const done   = myRequests.filter(r => r.status === 'completed' || r.status === 'rejected_by_admin');
   const rows   = sub === 'active' ? active : done;
+  const paged  = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  function toggleRow(id) {
-    setExpandedRows(p => {
-      const next = new Set(p);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }
+  function handleTabChange(key) { setSub(key); setSelected(null); setPage(1); }
 
   return (
     <div>
@@ -287,78 +403,53 @@ export function TabRequester({ myRequests, onCreate }) {
       <div className={styles.subTabs}>
         {[
           { key: 'active', label: 'Đang chờ',  count: active.length },
-          { key: 'done',   label: 'Đã xử lý', count: done.length },
+          { key: 'done',   label: 'Đã xử lý',  count: done.length },
         ].map(t => (
-          <button key={t.key} className={`${styles.subTab} ${sub === t.key ? styles.subTabActive : ''}`}
-            onClick={() => { setSub(t.key); setExpandedRows(new Set()); }}>
+          <button key={t.key}
+            className={`${styles.subTab} ${sub === t.key ? styles.subTabActive : ''}`}
+            onClick={() => handleTabChange(t.key)}
+          >
             {t.label}<span className={styles.subTabCount}>{t.count}</span>
           </button>
         ))}
       </div>
 
-      <div className={styles.card}>
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Request ID</th>
-                <th>Ứng dụng</th>
-                <th>PNL / Domain</th>
-                <th>Deadline</th>
-                <th>Tiến độ</th>
-                <th style={{ width: 36 }} />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr><td colSpan={6}><div className={styles.emptyState}><div className={styles.emptyIcon}>📭</div>Không có yêu cầu nào.</div></td></tr>
-              ) : rows.map(r => {
-                const isOpen = expandedRows.has(r.id);
-                return (
-                  <React.Fragment key={r.id}>
-                    <tr className={styles.tableRow} onClick={() => toggleRow(r.id)}>
-                      <td>
-                        <strong>{r.id}</strong>
-                        {r.is_urgent && <span className={styles.urgentChip}>⚡ Gấp</span>}
-                      </td>
-                      <td>
-                        <div className={styles.appTags}>
-                          {r.items.slice(0, 3).map(i => <span key={i.id} className={styles.appTag}>{i.application_name}</span>)}
-                          {r.items.length > 3 && <span className={styles.appTag}>+{r.items.length - 3}</span>}
-                        </div>
-                      </td>
-                      <td><span>{r.department_name}</span><span className={styles.subText}>{r.domain_name}</span></td>
-                      <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(r.deadline)}</td>
-                      <td><ProgressCompact status={r.status} /></td>
-                      <td>
-                        <button
-                          className={styles.rowToggle}
-                          onClick={e => { e.stopPropagation(); toggleRow(r.id); }}
-                          aria-label="Xem tiến độ"
-                        >
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-                            style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
-                            <polyline points="6 9 12 15 18 9"/>
-                          </svg>
-                        </button>
-                      </td>
-                    </tr>
-
-                    {isOpen && (
-                      <tr className={styles.expandedRow}>
-                        <td colSpan={6}>
-                          <div className={styles.expandedContent}>
-                            <ProgressStepper status={r.status} />
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </tbody>
-          </table>
+      <div className={styles.reqSplitPane}>
+        {/* Left: card list + pagination */}
+        <div className={styles.reqCardList}>
+          {rows.length === 0 ? (
+            <div className={styles.emptyState} style={{ padding: '2rem 1rem' }}>
+              <div className={styles.emptyIcon}>📭</div>
+              Không có yêu cầu nào.
+            </div>
+          ) : (
+            <>
+              {paged.map(req => (
+                <ReqCard
+                  key={req.id}
+                  req={req}
+                  isSelected={selected?.id === req.id}
+                  onClick={() => setSelected(p => p?.id === req.id ? null : req)}
+                />
+              ))}
+              <Pagination page={page} total={rows.length} pageSize={PAGE_SIZE} onChange={setPage} />
+            </>
+          )}
         </div>
+
+        {/* Right: detail or placeholder */}
+        {selected ? (
+          <ReqDetail key={selected.id} req={selected} />
+        ) : (
+          <div className={styles.reqDetailEmpty}>
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
+            <span>Chọn một yêu cầu để xem chi tiết</span>
+          </div>
+        )}
       </div>
     </div>
   );
