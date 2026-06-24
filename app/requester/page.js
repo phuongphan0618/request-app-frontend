@@ -7,16 +7,17 @@ import { getCurrentUser } from '../../lib/api';
 import LoginBackground from '../../components/login/LoginBackground';
 import styles from '../app/App.module.css';
 
-import { MOCK_USER, INITIAL_ALL_REQUESTS } from '../app/data';
 import { useToasts, ToastStack } from '../app/helpers';
 import { TabRequester } from '../app/TabRequester';
+import { getMyRequests } from '../../lib/api';
 
 export default function RequesterPage() {
   const router = useRouter();
   const { isDark, toggleTheme } = useTheme();
 
   const [user, setUser] = useState(null);
-  const [allRequests, setAllRequests] = useState(INITIAL_ALL_REQUESTS);
+  const [myRequests, setMyRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
   const { toasts, push: pushToast } = useToasts();
 
   useEffect(() => {
@@ -25,13 +26,28 @@ export default function RequesterPage() {
       setUser(currentUser);
     } else {
       router.push('/');
+      return;
     }
-  }, [router]);
 
-  const myRequests = allRequests.filter(r => r.requester_email === MOCK_USER.email);
+    // Fetch user's requests from API
+    async function fetchRequests() {
+      try {
+        setLoading(true);
+        const requests = await getMyRequests();
+        setMyRequests(requests || []);
+      } catch (err) {
+        console.error('Lỗi tải requests:', err);
+        pushToast('Không thể tải danh sách requests', 'error', '✕');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchRequests();
+  }, [router, pushToast]);
 
   function handleCreateRequest(newReq) {
-    setAllRequests(p => [newReq, ...p]);
+    setMyRequests(p => [newReq, ...p]);
     pushToast(`Đã gửi ${newReq.id} — chờ admin xem xét`, 'success', '✓');
   }
 
@@ -94,7 +110,13 @@ export default function RequesterPage() {
       {/* ── Main content ── */}
       <main className={styles.main}>
         <div className={styles.mainContent}>
-          <TabRequester myRequests={myRequests} onCreate={handleCreateRequest} />
+          {loading ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-gray)' }}>
+              Đang tải dữ liệu...
+            </div>
+          ) : (
+            <TabRequester myRequests={myRequests} onCreate={handleCreateRequest} />
+          )}
         </div>
       </main>
     </div>

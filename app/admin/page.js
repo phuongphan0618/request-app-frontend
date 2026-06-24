@@ -7,11 +7,11 @@ import { getCurrentUser } from '../../lib/api';
 import LoginBackground from '../../components/login/LoginBackground';
 import styles from '../app/App.module.css';
 
-import { INITIAL_ALL_REQUESTS } from '../app/data';
 import { useToasts, ToastStack } from '../app/helpers';
 import { RejectReasonModal } from '../app/RejectReasonModal';
 import { TabAdmin } from '../app/TabAdmin';
 import { BatchQueue } from '../app/BatchQueue';
+import { getAccessRequests } from '../../lib/api';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -19,7 +19,8 @@ export default function AdminPage() {
 
   const [user, setUser] = useState(null);
   const [hasAccess, setHasAccess] = useState(false);
-  const [allRequests, setAllRequests] = useState(INITIAL_ALL_REQUESTS);
+  const [allRequests, setAllRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [queue, setQueue] = useState([]);
   const [rejectTarget, setRejectTarget] = useState(null);
   const { toasts, push: pushToast } = useToasts();
@@ -39,10 +40,27 @@ export default function AdminPage() {
 
     if (roles.includes('sub-admin')) {
       setHasAccess(true);
+
+      // Fetch access requests from API
+      async function fetchRequests() {
+        try {
+          setLoading(true);
+          const requests = await getAccessRequests();
+          setAllRequests(requests || []);
+        } catch (err) {
+          console.error('Lỗi tải requests:', err);
+          pushToast('Không thể tải danh sách requests', 'error', '✕');
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      fetchRequests();
     } else {
       setHasAccess(false);
+      setLoading(false);
     }
-  }, [router]);
+  }, [router, pushToast]);
 
   const pendingAdmin = allRequests.filter(r => r.status === 'pending_admin').length;
 
@@ -231,7 +249,13 @@ export default function AdminPage() {
       {/* ── Main content ── */}
       <main className={styles.main}>
         <div className={styles.mainContent}>
-          <TabAdmin requests={allRequests} queue={queue} onApprove={handleAdminApprove} onReject={handleAdminReject} />
+          {loading ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-gray)' }}>
+              Đang tải dữ liệu...
+            </div>
+          ) : (
+            <TabAdmin requests={allRequests} queue={queue} onApprove={handleAdminApprove} onReject={handleAdminReject} />
+          )}
         </div>
       </main>
 
