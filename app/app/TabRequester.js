@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from './App.module.css';
-import { MOCK_CATALOG, MOCK_APP_OWNERS, MOCK_USER, genId } from './data';
+import { MOCK_APP_OWNERS, MOCK_USER, genId } from './data';
 import { fmtDate, fmtDateTime, StatusBadge } from './helpers';
 import { ClockIcon } from './TabAdmin';
+import { getDepartments, getDomains, getApplications, createRequest } from '../../lib/api';
 
 // ── Progress logic ────────────────────────────────────────────
 
@@ -211,51 +212,93 @@ function ReqDetail({ req }) {
 
 function CreateRequestModal({ onClose, onCreate }) {
   const [step, setStep]           = useState('form');
-  const [selDept, setSelDept]     = useState('');
-  const [selDomain, setSelDomain] = useState('');
-  const [selApps, setSelApps]     = useState([]);
+  const [selDeptId, setSelDeptId] = useState('');
+  const [selDomainId, setSelDomainId] = useState('');
+  const [selAppIds, setSelAppIds] = useState([]);
   const [reason, setReason]       = useState('');
   const [deadline, setDeadline]   = useState('');
   const [isUrgent, setIsUrgent]   = useState(false);
   const [error, setError]         = useState('');
+  const [loading, setLoading]     = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const depts   = Object.keys(MOCK_CATALOG);
-  const domains = selDept ? Object.keys(MOCK_CATALOG[selDept] ?? {}) : [];
-  const apps    = (selDept && selDomain) ? (MOCK_CATALOG[selDept]?.[selDomain] ?? []) : [];
+  const [departments, setDepartments] = useState([]);
+  const [domains, setDomains] = useState([]);
+  const [applications, setApplications] = useState([]);
 
-  function handleChangeDept(val)   { setSelDept(val); setSelDomain(''); setSelApps([]); }
-  function handleChangeDomain(val) { setSelDomain(val); setSelApps([]); }
-  function toggleApp(name)         { setSelApps(p => p.includes(name) ? p.filter(a => a !== name) : [...p, name]); }
+  useEffect(() => {
+    async function loadData() {
+      try {
+        setLoading(true);
+        const [depts, doms, apps] = await Promise.all([
+          getDepartments(),
+          getDomains(),
+          getApplications(),
+        ]);
+        setDepartments(depts || []);
+        setDomains(doms || []);
+        setApplications(apps || []);
+      } catch (err) {
+        setError('Không thể tải dữ liệu: ' + err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  const filteredDomains = domains.filter(d => d.department === selDeptId);
+  const filteredApps = applications.filter(a => a.domain === selDomainId);
+  const selectedApps = applications.filter(a => selAppIds.includes(a.id));
+
+  function handleChangeDept(val) { setSelDeptId(val); setSelDomainId(''); setSelAppIds([]); }
+  function handleChangeDomain(val) { setSelDomainId(val); setSelAppIds([]); }
+  function toggleApp(id) { setSelAppIds(p => p.includes(id) ? p.filter(a => a !== id) : [...p, id]); }
 
   function handleNext(e) {
     e.preventDefault();
-    if (!selDept || !selDomain || selApps.length === 0) {
+    if (!selDeptId || !selDomainId || selAppIds.length === 0) {
       setError('Vui lòng chọn PNL, Domain và ít nhất một ứng dụng.');
       return;
     }
     setError(''); setStep('confirm');
   }
 
-  function handleConfirm() {
-    const base = Date.now();
-    onCreate({
-      id: genId(),
-      created_at: new Date().toISOString(),
-      deadline: deadline || null,
-      status: 'pending_admin',
-      is_urgent: isUrgent,
-      requester_name: MOCK_USER.name,
-      requester_email: MOCK_USER.email,
-      department_name: selDept,
-      domain_name: selDomain,
-      reason,
-      items: selApps.map((name, i) => ({
-        id: base + i,
-        application_name: name,
-        ...(MOCK_APP_OWNERS[name] ?? { owner_name: 'Chưa phân công', owner_email: 'none@co.com' }),
-      })),
-    });
-    onClose();
+  async function handleConfirm() {
+    try {
+      setSubmitting(true);
+      const selectedDept = departments.find(d => d.id === selDeptId);
+      const selectedDomain = domains.find(d => d.id === selDomainId);
+
+      await createRequest({
+        reason,
+        deadline: deadline ? new Date(deadline).toISOString() : null,
+        application_ids: selAppIds,
+      });
+
+      onCreate({
+        id: genId(),
+        created_at: new Date().toISOString(),
+        deadline: deadline || null,
+        status: 'pending_admin',
+        is_urgent: isUrgent,
+        requester_name: MOCK_USER.name,
+        requester_email: MOCK_USER.email,
+        department_name: selectedDept?.name || '',
+        domain_name: selectedDomain?.name || '',
+        reason,
+        items: selectedApps.map((app, i) => ({
+          id: Date.now() + i,
+          application_name: app.name,
+          owner_name: app.owner_detail?.first_name + ' ' + app.owner_detail?.last_name || 'Chưa phân công',
+          owner_email: app.owner_detail?.email || 'none@co.com',
+        })),
+      });
+      onClose();
+    } catch (err) {
+      setError('Không thể tạo yêu cầu: ' + err.message);
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -276,19 +319,20 @@ function CreateRequestModal({ onClose, onCreate }) {
         {step === 'form' ? (
           <form onSubmit={handleNext} className={styles.modalForm}>
             {error && <div className={styles.modalError}>{error}</div>}
+            {loading && <div className={styles.modalError} style={{ background: '#3a3a3a', color: '#fff' }}>Đang tải dữ liệu...</div>}
             <div className={styles.formRow}>
               <div className={styles.formGroup}>
                 <label className={styles.formLabel}>PNL <span className={styles.required}>*</span></label>
-                <select className={styles.formSelect} value={selDept} onChange={e => handleChangeDept(e.target.value)}>
+                <select className={styles.formSelect} value={selDeptId} onChange={e => handleChangeDept(e.target.value)} disabled={loading}>
                   <option value="">— Chọn PNL —</option>
-                  {depts.map(d => <option key={d} value={d}>{d}</option>)}
+                  {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                 </select>
               </div>
               <div className={styles.formGroup}>
                 <label className={styles.formLabel}>Domain <span className={styles.required}>*</span></label>
-                <select className={styles.formSelect} value={selDomain} onChange={e => handleChangeDomain(e.target.value)} disabled={!selDept}>
+                <select className={styles.formSelect} value={selDomainId} onChange={e => handleChangeDomain(e.target.value)} disabled={!selDeptId}>
                   <option value="">— Chọn Domain —</option>
-                  {domains.map(d => <option key={d} value={d}>{d}</option>)}
+                  {filteredDomains.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                 </select>
               </div>
             </div>
@@ -296,17 +340,17 @@ function CreateRequestModal({ onClose, onCreate }) {
             <div className={styles.formGroup}>
               <label className={styles.formLabel}>
                 Ứng dụng <span className={styles.required}>*</span>
-                {selApps.length > 0 && <span className={styles.selCount}>{selApps.length} đã chọn</span>}
+                {selAppIds.length > 0 && <span className={styles.selCount}>{selAppIds.length} đã chọn</span>}
               </label>
-              {!selDomain ? (
+              {!selDomainId ? (
                 <div className={styles.appsPlaceholder}>Chọn Domain để xem danh sách ứng dụng</div>
               ) : (
                 <div className={styles.appsGrid}>
-                  {apps.map(name => (
-                    <label key={name} className={`${styles.appItem} ${selApps.includes(name) ? styles.appItemChecked : ''}`}>
-                      <input type="checkbox" className={styles.appCheckbox} checked={selApps.includes(name)} onChange={() => toggleApp(name)} />
-                      <span className={styles.appItemName}>{name}</span>
-                      {selApps.includes(name) && (
+                  {filteredApps.map(app => (
+                    <label key={app.id} className={`${styles.appItem} ${selAppIds.includes(app.id) ? styles.appItemChecked : ''}`}>
+                      <input type="checkbox" className={styles.appCheckbox} checked={selAppIds.includes(app.id)} onChange={() => toggleApp(app.id)} />
+                      <span className={styles.appItemName}>{app.name}</span>
+                      {selAppIds.includes(app.id) && (
                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ color: 'var(--color-red)', flexShrink: 0 }}>
                           <polyline points="20 6 9 17 4 12"/>
                         </svg>
@@ -333,18 +377,24 @@ function CreateRequestModal({ onClose, onCreate }) {
             </div>
 
             <div className={styles.modalActions}>
-              <button type="button" className={styles.btnSecondary} onClick={onClose}>Hủy</button>
-              <button type="submit" className={styles.btnPrimary}>Xem lại →</button>
+              <button type="button" className={styles.btnSecondary} onClick={onClose} disabled={submitting}>Hủy</button>
+              <button type="submit" className={styles.btnPrimary} disabled={submitting}>{submitting ? 'Đang gửi...' : 'Xem lại →'}</button>
             </div>
           </form>
         ) : (
           <div className={styles.confirmBody}>
             <div className={styles.confirmRows}>
-              <div className={styles.confirmRow}><span className={styles.confirmLabel}>PNL</span><span className={styles.confirmValue}>{selDept}</span></div>
-              <div className={styles.confirmRow}><span className={styles.confirmLabel}>Domain</span><span className={styles.confirmValue}>{selDomain}</span></div>
+              <div className={styles.confirmRow}>
+                <span className={styles.confirmLabel}>PNL</span>
+                <span className={styles.confirmValue}>{departments.find(d => d.id === selDeptId)?.name}</span>
+              </div>
+              <div className={styles.confirmRow}>
+                <span className={styles.confirmLabel}>Domain</span>
+                <span className={styles.confirmValue}>{domains.find(d => d.id === selDomainId)?.name}</span>
+              </div>
               <div className={styles.confirmRow}>
                 <span className={styles.confirmLabel}>Ứng dụng</span>
-                <div className={styles.confirmChips}>{selApps.map(a => <span key={a} className={styles.confirmChip}>{a}</span>)}</div>
+                <div className={styles.confirmChips}>{selectedApps.map(a => <span key={a.id} className={styles.confirmChip}>{a.name}</span>)}</div>
               </div>
               {reason   && <div className={styles.confirmRow}><span className={styles.confirmLabel}>Lý do</span><span className={styles.confirmValue}>{reason}</span></div>}
               {deadline && <div className={styles.confirmRow}><span className={styles.confirmLabel}>Thời hạn</span><span className={styles.confirmValue}>{fmtDate(deadline)}</span></div>}
@@ -356,8 +406,8 @@ function CreateRequestModal({ onClose, onCreate }) {
               )}
             </div>
             <div className={styles.modalActions}>
-              <button type="button" className={styles.btnSecondary} onClick={() => setStep('form')}>← Sửa lại</button>
-              <button type="button" className={styles.btnPrimary} onClick={handleConfirm}>Xác nhận & Gửi</button>
+              <button type="button" className={styles.btnSecondary} onClick={() => setStep('form')} disabled={submitting}>← Sửa lại</button>
+              <button type="button" className={styles.btnPrimary} onClick={handleConfirm} disabled={submitting}>{submitting ? 'Đang gửi...' : 'Xác nhận & Gửi'}</button>
             </div>
           </div>
         )}
