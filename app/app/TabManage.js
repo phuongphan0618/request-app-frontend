@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from './App.module.css';
+import { getDepartments, getDomains, createApplication, updateApplication, deleteApplication } from '../../lib/api';
+import { useToasts } from './helpers';
 
 const INIT_APPS = [
   { id: 1,  code: 'VPN',       name: 'VPN Nội bộ',             domain: 'INFRA',   dept: 'Hạ tầng',      owner: 'Nguyễn Văn An',  owner_email: 'an.nv@company.com',   active: true  },
@@ -78,6 +80,7 @@ function OptLabel() {
 // ── App management tab ──────────────────────────────────────────
 
 function AppTable() {
+  const { push: pushToast } = useToasts();
   const [apps, setApps]       = useState(INIT_APPS);
   const [domains, setDomains] = useState(INIT_DOMAINS);
   const [search, setSearch]   = useState('');
@@ -89,7 +92,45 @@ function AppTable() {
   const [editDomainTarget, setEditDomainTarget] = useState(null);
 
   const [domainForm, setDomainForm] = useState({ code: '', name: '', description: '', admin: '' });
-  const [appForm, setAppForm]       = useState({ name: '', code: '', domain: '', ownerId: '', active: true });
+  const [appForm, setAppForm]       = useState({ name: '', code: '', department: '', domain: '', ownerId: '', active: true });
+
+  // API data
+  const [departments, setDepartments] = useState([]);
+  const [allDomains, setAllDomains] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Fetch departments & domains when modal opens
+  useEffect(() => {
+    if (modal === 'addApp' || modal === 'editApp') {
+      async function fetchData() {
+        try {
+          const depts = await getDepartments();
+          const doms = await getDomains();
+          setDepartments(Array.isArray(depts) ? depts : []);
+          setAllDomains(Array.isArray(doms) ? doms : []);
+        } catch (err) {
+          console.error('Lỗi tải data:', err);
+        }
+      }
+      fetchData();
+    }
+  }, [modal]);
+
+  // Set appForm when editing app and data is loaded
+  useEffect(() => {
+    if (modal === 'editApp' && editAppTarget && allDomains.length > 0) {
+      const domainObj = allDomains.find(d => d.code === editAppTarget.domain);
+      const matched = MOCK_USERS.find(u => u.email === editAppTarget.owner_email);
+      setAppForm({
+        name: editAppTarget.name,
+        code: editAppTarget.code,
+        domain: domainObj ? String(domainObj.id) : '',
+        department: domainObj ? String(domainObj.department) : '',
+        ownerId: matched ? String(matched.id) : '',
+        active: editAppTarget.active,
+      });
+    }
+  }, [modal, editAppTarget, allDomains]);
 
   const filtered = search
     ? apps.filter(a =>
@@ -144,14 +185,12 @@ function AppTable() {
   // ── App actions ───────────────────────────────────────────────
 
   function openAddApp() {
-    setAppForm({ name: '', code: '', domain: domains[0]?.code ?? '', ownerId: '', active: true });
+    setAppForm({ name: '', code: '', department: '', domain: '', ownerId: '', active: true });
     setModal('addApp');
   }
 
   function openEditApp(app) {
     setEditAppTarget(app);
-    const matched = MOCK_USERS.find(u => u.email === app.owner_email);
-    setAppForm({ name: app.name, code: app.code, domain: app.domain, ownerId: matched ? String(matched.id) : '', active: app.active });
     setModal('editApp');
   }
 
@@ -160,40 +199,96 @@ function AppTable() {
     return u ? { owner: `${u.last_name} ${u.first_name}`, owner_email: u.email } : { owner: null, owner_email: null };
   }
 
-  function handleAddApp(e) {
+  async function handleAddApp(e) {
     e.preventDefault();
-    const { owner, owner_email } = resolveOwner(appForm.ownerId);
-    setApps(p => [{
-      id: Date.now(),
-      code: appForm.code.toUpperCase(),
-      name: appForm.name,
-      domain: appForm.domain,
-      dept: '—',
-      owner,
-      owner_email,
-      active: appForm.active,
-    }, ...p]);
-    setModal(null);
-    setPage(1);
+    if (isSubmitting) return;
+
+    try {
+      setIsSubmitting(true);
+      const payload = {
+        name: appForm.name,
+        code: appForm.code.toUpperCase(),
+        description: '',
+        domain: appForm.domain,
+        owner: appForm.ownerId ? parseInt(appForm.ownerId) : null,
+        is_active: appForm.active,
+      };
+
+      await createApplication(payload);
+      pushToast(`Đã tạo ${appForm.code} thành công`, 'success', '✓');
+
+      // Add to local state for immediate UI update
+      const { owner, owner_email } = resolveOwner(appForm.ownerId);
+      setApps(p => [{
+        id: Date.now(),
+        code: appForm.code.toUpperCase(),
+        name: appForm.name,
+        domain: appForm.domain,
+        dept: '—',
+        owner,
+        owner_email,
+        active: appForm.active,
+      }, ...p]);
+
+      setModal(null);
+      setPage(1);
+    } catch (err) {
+      console.error('Lỗi tạo app:', err);
+      pushToast(err.message || 'Không thể tạo application', 'error', '✕');
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
-  function handleEditApp(e) {
+  async function handleEditApp(e) {
     e.preventDefault();
-    const { owner, owner_email } = resolveOwner(appForm.ownerId);
-    setApps(p => p.map(a => a.id === editAppTarget.id ? {
-      ...a,
-      name: appForm.name,
-      code: appForm.code.toUpperCase(),
-      domain: appForm.domain,
-      owner,
-      owner_email,
-      active: appForm.active,
-    } : a));
-    setModal(null);
+    if (isSubmitting) return;
+
+    try {
+      setIsSubmitting(true);
+      const payload = {
+        name: appForm.name,
+        code: appForm.code.toUpperCase(),
+        description: '',
+        domain: appForm.domain,
+        owner: appForm.ownerId ? parseInt(appForm.ownerId) : null,
+        is_active: appForm.active,
+      };
+
+      await updateApplication(editAppTarget.id, payload);
+      pushToast(`Đã cập nhật ${appForm.code} thành công`, 'success', '✓');
+
+      const { owner, owner_email } = resolveOwner(appForm.ownerId);
+      setApps(p => p.map(a => a.id === editAppTarget.id ? {
+        ...a,
+        name: appForm.name,
+        code: appForm.code.toUpperCase(),
+        domain: appForm.domain,
+        owner,
+        owner_email,
+        active: appForm.active,
+      } : a));
+
+      setModal(null);
+    } catch (err) {
+      console.error('Lỗi sửa app:', err);
+      pushToast(err.message || 'Không thể cập nhật application', 'error', '✕');
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
-  function handleDeleteApp(id) {
-    setApps(p => p.filter(a => a.id !== id));
+  async function handleDeleteApp(id) {
+    if (!confirm('Bạn có chắc muốn xóa application này?')) return;
+
+    try {
+      await deleteApplication(id);
+      pushToast('Đã xóa application thành công', 'success', '✓');
+      setApps(p => p.filter(a => a.id !== id));
+    } catch (err) {
+      console.error('Lỗi xóa app:', err);
+      pushToast(err.message || 'Không thể xóa application', 'error', '✕');
+    }
   }
 
   // ── Shared form sections ──────────────────────────────────────
@@ -227,27 +322,41 @@ function AppTable() {
   }
 
   function AppFormFields({ showActive }) {
+    // Filter domains based on selected department
+    const filteredDomains = appForm.department
+      ? allDomains.filter(d => String(d.department) === String(appForm.department))
+      : [];
+
     return (
       <>
         <div className={styles.formGroup}>
           <label className={styles.formLabel}>Tên ứng dụng <span className={styles.required}>*</span></label>
           <input className={styles.formInput} type="text" placeholder="VD: Hệ thống VPN nội bộ" required autoFocus
-            value={appForm.name} onChange={e => setAppForm(p => ({ ...p, name: e.target.value }))} />
+            value={appForm.name} onChange={e => setAppForm(p => ({ ...p, name: e.target.value }))} disabled={isSubmitting} />
         </div>
         <div className={styles.formGroup}>
           <label className={styles.formLabel}>Mã app <span className={styles.required}>*</span></label>
           <input className={styles.formInput} type="text" placeholder="VD: VPN" required
-            value={appForm.code} onChange={e => setAppForm(p => ({ ...p, code: e.target.value.toUpperCase() }))} />
+            value={appForm.code} onChange={e => setAppForm(p => ({ ...p, code: e.target.value.toUpperCase() }))} disabled={isSubmitting} />
         </div>
         <div className={styles.formGroup}>
-          <label className={styles.formLabel}>Domain</label>
-          <select className={styles.formSelect} value={appForm.domain} onChange={e => setAppForm(p => ({ ...p, domain: e.target.value }))}>
-            {domains.map(d => <option key={d.id} value={d.code}>{d.code}{d.name ? ` — ${d.name}` : ''}</option>)}
+          <label className={styles.formLabel}>PNL (Phòng ban) <span className={styles.required}>*</span></label>
+          <select className={styles.formSelect} value={appForm.department} onChange={e => setAppForm(p => ({ ...p, department: e.target.value, domain: '' }))} required disabled={isSubmitting}>
+            <option value="">-- Chọn PNL --</option>
+            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
         </div>
         <div className={styles.formGroup}>
+          <label className={styles.formLabel}>Domain <span className={styles.required}>*</span></label>
+          <select className={styles.formSelect} value={appForm.domain} onChange={e => setAppForm(p => ({ ...p, domain: e.target.value }))} required disabled={isSubmitting || !appForm.department}>
+            <option value="">-- Chọn Domain --</option>
+            {filteredDomains.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+          {!appForm.department && <small style={{ color: 'var(--text-secondary)', marginTop: 4 }}>Hãy chọn PNL trước</small>}
+        </div>
+        <div className={styles.formGroup}>
           <label className={styles.formLabel}>Owner quản lý <OptLabel /></label>
-          <select className={styles.formSelect} value={appForm.ownerId} onChange={e => setAppForm(p => ({ ...p, ownerId: e.target.value }))}>
+          <select className={styles.formSelect} value={appForm.ownerId} onChange={e => setAppForm(p => ({ ...p, ownerId: e.target.value }))} disabled={isSubmitting}>
             <option value="">— Chưa phân quyền —</option>
             {MOCK_USERS.map(u => (
               <option key={u.id} value={String(u.id)}>
@@ -260,6 +369,7 @@ function AppTable() {
           <div className={styles.formGroup} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <input type="checkbox" id="chkActive" checked={appForm.active}
               onChange={e => setAppForm(p => ({ ...p, active: e.target.checked }))}
+              disabled={isSubmitting}
               style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--color-red)' }} />
             <label htmlFor="chkActive" className={styles.formLabel} style={{ cursor: 'pointer', textTransform: 'none', letterSpacing: 0 }}>
               Đang hoạt động
@@ -418,13 +528,13 @@ function AppTable() {
           <div className={styles.modalBox} onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
             <div className={styles.modalHeader}>
               <h3 className={styles.modalTitle}>Thêm ứng dụng</h3>
-              <button className={styles.modalClose} onClick={() => setModal(null)}>✕</button>
+              <button className={styles.modalClose} onClick={() => setModal(null)} disabled={isSubmitting}>✕</button>
             </div>
             <form className={styles.modalForm} onSubmit={handleAddApp}>
               <AppFormFields showActive={false} />
               <div className={styles.modalActions}>
-                <button type="button" className={styles.btnSecondary} onClick={() => setModal(null)}>Hủy</button>
-                <button type="submit" className={styles.btnPrimary}>Thêm</button>
+                <button type="button" className={styles.btnSecondary} onClick={() => setModal(null)} disabled={isSubmitting}>Hủy</button>
+                <button type="submit" className={styles.btnPrimary} disabled={isSubmitting}>{isSubmitting ? 'Đang thêm...' : 'Thêm'}</button>
               </div>
             </form>
           </div>
@@ -437,13 +547,13 @@ function AppTable() {
           <div className={styles.modalBox} onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
             <div className={styles.modalHeader}>
               <h3 className={styles.modalTitle}>Sửa: {editAppTarget.code}</h3>
-              <button className={styles.modalClose} onClick={() => setModal(null)}>✕</button>
+              <button className={styles.modalClose} onClick={() => setModal(null)} disabled={isSubmitting}>✕</button>
             </div>
             <form className={styles.modalForm} onSubmit={handleEditApp}>
               <AppFormFields showActive={true} />
               <div className={styles.modalActions}>
-                <button type="button" className={styles.btnSecondary} onClick={() => setModal(null)}>Hủy</button>
-                <button type="submit" className={styles.btnPrimary}>Lưu thay đổi</button>
+                <button type="button" className={styles.btnSecondary} onClick={() => setModal(null)} disabled={isSubmitting}>Hủy</button>
+                <button type="submit" className={styles.btnPrimary} disabled={isSubmitting}>{isSubmitting ? 'Đang lưu...' : 'Lưu thay đổi'}</button>
               </div>
             </form>
           </div>
