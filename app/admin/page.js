@@ -264,9 +264,11 @@ export default function AdminPage() {
       </main>
 
       {/* ── Right panel: batch queue (admin only) ── */}
-      <div className={styles.rightPanel}>
-        <BatchQueue queue={queue} onRemoveItem={handleRemoveItem} onSendSelected={handleSendSelected} />
-      </div>
+      {adminView !== 'manage' && (
+        <div className={styles.rightPanel}>
+          <BatchQueue queue={queue} onRemoveItem={handleRemoveItem} onSendSelected={handleSendSelected} />
+        </div>
+      )}
     </div>
   );
 }

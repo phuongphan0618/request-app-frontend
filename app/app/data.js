@@ -255,18 +255,32 @@ export const INITIAL_ALL_REQUESTS = [
 
 export const MOCK_OWNER_BATCHES = [
   {
-    id: 'BATCH-01', sent_at: '2026-06-20T08:00:00Z', item_count: 3,
+    id: 'BATCH-00', sent_at: '2026-06-10T08:00:00Z',
     items: [
-      { id: 21, application_name: 'AWS Console', application_code: 'AWS', requester_name: 'Trần Thị B', status: 'pending_owner', owner_note: null },
-      { id: 22, application_name: 'AWS Console', application_code: 'AWS', requester_name: 'Lê Văn C',   status: 'approved',      owner_note: 'OK' },
-      { id: 23, application_name: 'Datadog',     application_code: 'DD',  requester_name: 'Phạm Thị D', status: 'pending_owner', owner_note: null },
+      { id: 20, application_name: 'Slack', application_code: 'SL', domain: 'COMM', requester_name: 'Nguyễn Văn A', requester_email: 'a.nguyen@company.com', status: 'approved',         owner_note: 'Đã duyệt',           is_urgent: false },
+      { id: 19, application_name: 'Zoom',  application_code: 'ZM', domain: 'COMM', requester_name: 'Trần Thị X',   requester_email: 'x.tran@company.com',   status: 'rejected_by_owner', owner_note: 'Chưa đủ điều kiện', is_urgent: false },
     ],
   },
   {
-    id: 'BATCH-02', sent_at: '2026-06-18T14:30:00Z', item_count: 2,
+    id: 'BATCH-01', sent_at: '2026-06-15T09:00:00Z',
     items: [
-      { id: 24, application_name: 'AWS Console', application_code: 'AWS', requester_name: 'Hoàng Văn E', status: 'approved',         owner_note: 'Approved' },
-      { id: 25, application_name: 'Datadog',     application_code: 'DD',  requester_name: 'Ngô Thị F',   status: 'rejected_by_owner', owner_note: 'Chưa đủ điều kiện' },
+      { id: 21, application_name: 'GitHub Enterprise', application_code: 'GH',  domain: 'DEV',   requester_name: 'Trần Thị B', requester_email: 'b.tran@company.com',   status: 'pending_owner', owner_note: null, is_urgent: true  },
+      { id: 22, application_name: 'Jira Cloud',        application_code: 'JC',  domain: 'DEV',   requester_name: 'Lê Văn C',   requester_email: 'c.le@company.com',     status: 'pending_owner', owner_note: null, is_urgent: false },
+      { id: 23, application_name: 'Confluence',        application_code: 'CF',  domain: 'DEV',   requester_name: 'Phạm Thị D', requester_email: 'd.pham@company.com',   status: 'pending_owner', owner_note: null, is_urgent: false },
+    ],
+  },
+  {
+    id: 'BATCH-02', sent_at: '2026-06-18T14:30:00Z',
+    items: [
+      { id: 24, application_name: 'AWS Console', application_code: 'AWS', domain: 'INFRA', requester_name: 'Hoàng Văn E', requester_email: 'e.hoang@company.com', status: 'pending_owner', owner_note: null, is_urgent: false },
+      { id: 25, application_name: 'Datadog',     application_code: 'DD',  domain: 'OPS',   requester_name: 'Ngô Thị F',   requester_email: 'f.ngo@company.com',   status: 'pending_owner', owner_note: null, is_urgent: true  },
+    ],
+  },
+  {
+    id: 'BATCH-03', sent_at: '2026-06-20T08:00:00Z',
+    items: [
+      { id: 26, application_name: 'AWS Console', application_code: 'AWS', domain: 'INFRA', requester_name: 'Vũ Thị G',   requester_email: 'g.vu@company.com',    status: 'pending_owner', owner_note: null, is_urgent: false },
+      { id: 27, application_name: 'Grafana',     application_code: 'GF',  domain: 'OPS',   requester_name: 'Đỗ Minh H',  requester_email: 'h.do@company.com',    status: 'pending_owner', owner_note: null, is_urgent: false },
     ],
   },
 ];

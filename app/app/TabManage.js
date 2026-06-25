@@ -1,9 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import styles from './App.module.css';
-import { getDepartments, getDomains, createApplication, updateApplication, deleteApplication } from '../../lib/api';
-import { useToasts } from './helpers';
 
 const INIT_APPS = [
   { id: 1,  code: 'VPN',       name: 'VPN Nội bộ',             domain: 'INFRA',   dept: 'Hạ tầng',      owner: 'Nguyễn Văn An',  owner_email: 'an.nv@company.com',   active: true  },
@@ -26,27 +24,20 @@ const INIT_DOMAINS = [
   { id: 5, code: 'DESIGN', name: 'Thiết kế',      description: '', admin: '' },
 ];
 
-const MOCK_USERS = [
-  { id: 1, last_name: 'Nguyễn', first_name: 'Văn An',    email: 'an.nv@company.com',    role: 'requester'  },
-  { id: 2, last_name: 'Trần',   first_name: 'Thị Bích',  email: 'bich.tt@company.com',  role: 'owner'      },
-  { id: 3, last_name: 'Lê',     first_name: 'Minh Tú',   email: 'tu.lm@company.com',    role: 'owner'      },
-  { id: 4, last_name: 'Phạm',   first_name: 'Hoàng Nam', email: 'nam.ph@company.com',   role: 'requester'  },
-  { id: 5, last_name: 'Hoàng',  first_name: 'Thu Hà',    email: 'ha.ht@company.com',    role: 'sub-admin'  },
-  { id: 6, last_name: 'Đỗ',     first_name: 'Quốc Bảo',  email: 'bao.dq@company.com',   role: 'requester'  },
-  { id: 7, last_name: 'Vũ',     first_name: 'Thành Long', email: 'long.vt@company.com',  role: 'requester'  },
-  { id: 8, last_name: 'Bùi',    first_name: 'Lan Anh',   email: 'anh.bl@company.com',   role: 'owner'      },
+const INIT_USERS = [
+  { id: 1, last_name: 'Nguyễn', first_name: 'Văn An',    email: 'an.nv@company.com',    roles: []            },
+  { id: 2, last_name: 'Trần',   first_name: 'Thị Bích',  email: 'bich.tt@company.com',  roles: ['owner']     },
+  { id: 3, last_name: 'Lê',     first_name: 'Minh Tú',   email: 'tu.lm@company.com',    roles: ['owner']     },
+  { id: 4, last_name: 'Phạm',   first_name: 'Hoàng Nam', email: 'nam.ph@company.com',   roles: []            },
+  { id: 5, last_name: 'Hoàng',  first_name: 'Thu Hà',    email: 'ha.ht@company.com',    roles: ['sub-admin'] },
+  { id: 6, last_name: 'Đỗ',     first_name: 'Quốc Bảo',  email: 'bao.dq@company.com',   roles: []            },
+  { id: 7, last_name: 'Vũ',     first_name: 'Thành Long', email: 'long.vt@company.com',  roles: []            },
+  { id: 8, last_name: 'Bùi',    first_name: 'Lan Anh',   email: 'anh.bl@company.com',   roles: ['owner']     },
 ];
-
-const ROLE_LABEL = { requester: 'Requester', owner: 'Owner', 'sub-admin': 'Admin' };
-const ROLE_COLOR  = {
-  requester:   { background: 'rgba(139,133,193,0.13)', color: '#a09ab9' },
-  owner:       { background: 'rgba(46,204,113,0.12)',  color: '#2ecc71' },
-  'sub-admin': { background: 'rgba(222,26,26,0.11)',   color: '#ff6b6b' },
-};
 
 const PAGE_SIZE = 8;
 
-// ── Icons ───────────────────────────────────────────────────────
+// ── Shared icons ─────────────────────────────────────────────────
 
 function IconBtn({ title, onClick, danger, children }) {
   return (
@@ -71,79 +62,297 @@ const DeleteIcon = () => (
   </svg>
 );
 
-// ── Optional label helper ────────────────────────────────────────
-
 function OptLabel() {
   return <span style={{ opacity: 0.45, fontWeight: 400, fontSize: '0.75rem' }}>(tuỳ chọn)</span>;
 }
 
-// ── App management tab ──────────────────────────────────────────
+// ── Confirm delete modal ─────────────────────────────────────────
 
-function AppTable() {
-  const { push: pushToast } = useToasts();
-  const [apps, setApps]       = useState(INIT_APPS);
-  const [domains, setDomains] = useState(INIT_DOMAINS);
-  const [search, setSearch]   = useState('');
-  const [page, setPage]       = useState(1);
+function ConfirmModal({ label, onCancel, onConfirm }) {
+  return (
+    <div className={styles.modalBackdrop} onClick={onCancel}>
+      <div className={styles.modalBox} onClick={e => e.stopPropagation()}
+        style={{ maxWidth: 320, textAlign: 'center', padding: '2rem 1.75rem 1.5rem', position: 'relative' }}
+      >
+        <button className={styles.modalClose} onClick={onCancel}
+          style={{ position: 'absolute', top: 12, right: 12 }}>✕</button>
 
-  // modal: null | 'addDomain' | 'editDomain' | 'addApp' | 'editApp'
-  const [modal, setModal]               = useState(null);
-  const [editAppTarget, setEditAppTarget]       = useState(null);
-  const [editDomainTarget, setEditDomainTarget] = useState(null);
+        {/* Warning icon */}
+        <div style={{
+          width: 52, height: 52, borderRadius: '50%',
+          background: 'rgba(222,26,26,0.1)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 1rem',
+        }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--color-red)" strokeWidth="2.2">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          </svg>
+        </div>
 
-  const [domainForm, setDomainForm] = useState({ code: '', name: '', description: '', admin: '' });
-  const [appForm, setAppForm]       = useState({ name: '', code: '', department: '', domain: '', ownerId: '', active: true });
+        <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 0.5rem', color: 'var(--text-primary)' }}>
+          Xác nhận xóa
+        </h3>
+        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: '0 0 1.5rem', lineHeight: 1.6 }}>
+          Bạn có chắc muốn xóa{' '}
+          <strong style={{ color: 'var(--text-primary)' }}>{label}</strong>?
+          <br />Thao tác này không thể hoàn tác.
+        </p>
 
-  // API data
-  const [departments, setDepartments] = useState([]);
-  const [allDomains, setAllDomains] = useState([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+          <button type="button" className={styles.btnPrimary} onClick={onConfirm}
+            style={{ minWidth: 88 }}>Xóa</button>
+          <button type="button" className={styles.btnSecondary} onClick={onCancel}
+            style={{ minWidth: 88 }}>Hủy</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  // Fetch departments & domains when modal opens
-  useEffect(() => {
-    if (modal === 'addApp' || modal === 'editApp') {
-      async function fetchData() {
-        try {
-          const depts = await getDepartments();
-          const doms = await getDomains();
-          setDepartments(Array.isArray(depts) ? depts : []);
-          setAllDomains(Array.isArray(doms) ? doms : []);
-        } catch (err) {
-          console.error('Lỗi tải data:', err);
-        }
-      }
-      fetchData();
-    }
-  }, [modal]);
+// ── App management ───────────────────────────────────────────────
 
-  // Set appForm when editing app and data is loaded
-  useEffect(() => {
-    if (modal === 'editApp' && editAppTarget && allDomains.length > 0) {
-      const domainObj = allDomains.find(d => d.code === editAppTarget.domain);
-      const matched = MOCK_USERS.find(u => u.email === editAppTarget.owner_email);
-      setAppForm({
-        name: editAppTarget.name,
-        code: editAppTarget.code,
-        domain: domainObj ? String(domainObj.id) : '',
-        department: domainObj ? String(domainObj.department) : '',
-        ownerId: matched ? String(matched.id) : '',
-        active: editAppTarget.active,
-      });
-    }
-  }, [modal, editAppTarget, allDomains]);
+function AppTable({ apps, setApps, domains }) {
+  const [search, setSearch]           = useState('');
+  const [filterDomain, setFilterDomain] = useState('');
+  const [page, setPage]               = useState(1);
+  const [modal, setModal]             = useState(null); // null | 'addApp' | 'editApp'
+  const [editAppTarget, setEditAppTarget] = useState(null);
+  const [appForm, setAppForm]         = useState({ name: '', code: '', domain: '', ownerId: '', active: true });
+  const [confirmDelete, setConfirmDelete] = useState(null); // null | { id, label }
 
-  const filtered = search
-    ? apps.filter(a =>
+  let filtered = filterDomain ? apps.filter(a => a.domain === filterDomain) : apps;
+  filtered = search
+    ? filtered.filter(a =>
         a.name.toLowerCase().includes(search.toLowerCase()) ||
         a.code.toLowerCase().includes(search.toLowerCase()) ||
         a.domain.toLowerCase().includes(search.toLowerCase())
       )
-    : apps;
+    : filtered;
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  // ── Domain actions ────────────────────────────────────────────
+  function openAddApp() {
+    setAppForm({ name: '', code: '', domain: domains[0]?.code ?? '', ownerId: '', active: true });
+    setModal('addApp');
+  }
+
+  function openEditApp(app) {
+    setEditAppTarget(app);
+    const matched = INIT_USERS.find(u => u.email === app.owner_email);
+    setAppForm({ name: app.name, code: app.code, domain: app.domain, ownerId: matched ? String(matched.id) : '', active: app.active });
+    setModal('editApp');
+  }
+
+  function resolveOwner(ownerId) {
+    const u = INIT_USERS.find(u => String(u.id) === ownerId);
+    return u ? { owner: `${u.last_name} ${u.first_name}`, owner_email: u.email } : { owner: null, owner_email: null };
+  }
+
+  function handleAddApp(e) {
+    e.preventDefault();
+    const { owner, owner_email } = resolveOwner(appForm.ownerId);
+    setApps(p => [{
+      id: Date.now(), code: appForm.code.toUpperCase(), name: appForm.name,
+      domain: appForm.domain, dept: '—', owner, owner_email, active: appForm.active,
+    }, ...p]);
+    setModal(null); setPage(1);
+  }
+
+  function handleEditApp(e) {
+    e.preventDefault();
+    const { owner, owner_email } = resolveOwner(appForm.ownerId);
+    setApps(p => p.map(a => a.id === editAppTarget.id
+      ? { ...a, name: appForm.name, code: appForm.code.toUpperCase(), domain: appForm.domain, owner, owner_email, active: appForm.active }
+      : a
+    ));
+    setModal(null);
+  }
+
+  function AppFormFields({ showActive }) {
+    return (
+      <>
+        <div className={styles.formGroup}>
+          <label className={styles.formLabel}>Tên ứng dụng <span className={styles.required}>*</span></label>
+          <input className={styles.formInput} type="text" placeholder="VD: Hệ thống VPN nội bộ" required autoFocus
+            value={appForm.name} onChange={e => setAppForm(p => ({ ...p, name: e.target.value }))} />
+        </div>
+        <div className={styles.formGroup}>
+          <label className={styles.formLabel}>Mã app <span className={styles.required}>*</span></label>
+          <input className={styles.formInput} type="text" placeholder="VD: VPN" required
+            value={appForm.code} onChange={e => setAppForm(p => ({ ...p, code: e.target.value.toUpperCase() }))} />
+        </div>
+        <div className={styles.formGroup}>
+          <label className={styles.formLabel}>Domain</label>
+          <select className={styles.formSelect} value={appForm.domain} onChange={e => setAppForm(p => ({ ...p, domain: e.target.value }))}>
+            {domains.map(d => <option key={d.id} value={d.code}>{d.code}{d.name ? ` — ${d.name}` : ''}</option>)}
+          </select>
+        </div>
+        <div className={styles.formGroup}>
+          <label className={styles.formLabel}>Owner quản lý <OptLabel /></label>
+          <select className={styles.formSelect} value={appForm.ownerId} onChange={e => setAppForm(p => ({ ...p, ownerId: e.target.value }))}>
+            <option value="">— Chưa phân quyền —</option>
+            {INIT_USERS.map(u => (
+              <option key={u.id} value={String(u.id)}>{u.last_name} {u.first_name} ({u.email})</option>
+            ))}
+          </select>
+        </div>
+        {showActive && (
+          <div className={styles.formGroup} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" id="chkActive" checked={appForm.active}
+              onChange={e => setAppForm(p => ({ ...p, active: e.target.checked }))}
+              style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--color-red)' }} />
+            <label htmlFor="chkActive" className={styles.formLabel} style={{ cursor: 'pointer', textTransform: 'none', letterSpacing: 0 }}>
+              Đang hoạt động
+            </label>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  return (
+    <div>
+      <div className={styles.mgmtToolbar}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className={styles.searchBox} style={{ maxWidth: 240 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0, color: 'var(--text-secondary)' }}>
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            <input className={styles.searchInput} placeholder="Tìm app, mã, domain…"
+              value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
+          </div>
+          <select
+            className={styles.filterSelect}
+            value={filterDomain}
+            onChange={e => { setFilterDomain(e.target.value); setPage(1); }}
+          >
+            <option value="">Tất cả domain</option>
+            {domains.map(d => <option key={d.id} value={d.code}>{d.code}{d.name ? ` — ${d.name}` : ''}</option>)}
+          </select>
+        </div>
+        <button className={styles.mgmtAddBtn} onClick={openAddApp}>+ Thêm app</button>
+      </div>
+
+      <div className={styles.mgmtTableWrap}>
+        <table className={styles.mgmtTable}>
+          <thead>
+            <tr>
+              <th>Mã App</th><th>Tên ứng dụng</th><th>Domain</th><th>Phòng ban</th>
+              <th>Owner</th><th>Trạng thái</th><th style={{ width: 72 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {paged.length > 0 ? paged.map(app => (
+              <tr key={app.id} className={styles.mgmtRow}>
+                <td><strong style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: '0.8rem' }}>{app.code}</strong></td>
+                <td>{app.name}</td>
+                <td><span className={styles.mgmtDomainTag}>{app.domain}</span></td>
+                <td style={{ color: 'var(--text-secondary)', fontSize: '0.84rem' }}>{app.dept}</td>
+                <td>
+                  {app.owner
+                    ? <div><div style={{ fontSize: '0.84rem' }}>{app.owner}</div><div style={{ fontSize: '0.73rem', color: 'var(--text-secondary)' }}>{app.owner_email}</div></div>
+                    : <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.8rem' }}>Chưa phân quyền</span>
+                  }
+                </td>
+                <td>
+                  <span className={styles.mgmtBadge} style={app.active
+                    ? { background: 'rgba(46,204,113,0.12)', color: '#2ecc71' }
+                    : { background: 'rgba(160,154,185,0.1)', color: 'var(--text-secondary)' }
+                  }>{app.active ? '● Hoạt động' : '○ Tạm dừng'}</span>
+                </td>
+                <td>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <IconBtn title="Sửa" onClick={() => openEditApp(app)}><EditIcon /></IconBtn>
+                    <IconBtn title="Xóa" danger onClick={() => setConfirmDelete({ id: app.id, label: app.code })}><DeleteIcon /></IconBtn>
+                  </div>
+                </td>
+              </tr>
+            )) : (
+              <tr><td colSpan={7} className={styles.mgmtEmpty}>Không tìm thấy ứng dụng nào.</td></tr>
+            )}
+          </tbody>
+        </table>
+
+        {totalPages > 1 && (
+          <div className={styles.mgmtPagination}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} / {filtered.length}
+            </span>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button className={styles.mgmtPageBtn} disabled={page === 1} onClick={() => setPage(p => p - 1)}>‹</button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                <button key={p} className={`${styles.mgmtPageBtn} ${p === page ? styles.mgmtPageBtnActive : ''}`} onClick={() => setPage(p)}>{p}</button>
+              ))}
+              <button className={styles.mgmtPageBtn} disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>›</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {modal === 'addApp' && (
+        <div className={styles.modalBackdrop} onClick={() => setModal(null)}>
+          <div className={styles.modalBox} onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>Thêm ứng dụng</h3>
+              <button className={styles.modalClose} onClick={() => setModal(null)}>✕</button>
+            </div>
+            <form className={styles.modalForm} onSubmit={handleAddApp}>
+              <AppFormFields showActive={false} />
+              <div className={styles.modalActions}>
+                <button type="button" className={styles.btnSecondary} onClick={() => setModal(null)}>Hủy</button>
+                <button type="submit" className={styles.btnPrimary}>Thêm</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {modal === 'editApp' && editAppTarget && (
+        <div className={styles.modalBackdrop} onClick={() => setModal(null)}>
+          <div className={styles.modalBox} onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>Sửa: {editAppTarget.code}</h3>
+              <button className={styles.modalClose} onClick={() => setModal(null)}>✕</button>
+            </div>
+            <form className={styles.modalForm} onSubmit={handleEditApp}>
+              <AppFormFields showActive={true} />
+              <div className={styles.modalActions}>
+                <button type="button" className={styles.btnSecondary} onClick={() => setModal(null)}>Hủy</button>
+                <button type="submit" className={styles.btnPrimary}>Lưu thay đổi</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {confirmDelete && (
+        <ConfirmModal
+          label={confirmDelete.label}
+          onCancel={() => setConfirmDelete(null)}
+          onConfirm={() => { setApps(p => p.filter(a => a.id !== confirmDelete.id)); setConfirmDelete(null); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Domain management ────────────────────────────────────────────
+
+function DomainTable({ domains, setDomains, apps, setApps }) {
+  const [search, setSearch]                     = useState('');
+  const [modal, setModal]                       = useState(null); // null | 'addDomain' | 'editDomain'
+  const [editDomainTarget, setEditDomainTarget] = useState(null);
+  const [domainForm, setDomainForm]             = useState({ code: '', name: '', description: '', admin: '' });
+  const [confirmDelete, setConfirmDelete]       = useState(null);
+
+  const filtered = search
+    ? domains.filter(d =>
+        d.code.toLowerCase().includes(search.toLowerCase()) ||
+        d.name.toLowerCase().includes(search.toLowerCase())
+      )
+    : domains;
 
   function openAddDomain() {
     setDomainForm({ code: '', name: '', description: '', admin: '' });
@@ -154,10 +363,6 @@ function AppTable() {
     setEditDomainTarget(d);
     setDomainForm({ code: d.code, name: d.name, description: d.description || '', admin: d.admin || '' });
     setModal('editDomain');
-  }
-
-  function handleDeleteDomain(id) {
-    setDomains(p => p.filter(d => d.id !== id));
   }
 
   function handleAddDomain(e) {
@@ -181,117 +386,6 @@ function AppTable() {
     }
     setModal(null);
   }
-
-  // ── App actions ───────────────────────────────────────────────
-
-  function openAddApp() {
-    setAppForm({ name: '', code: '', department: '', domain: '', ownerId: '', active: true });
-    setModal('addApp');
-  }
-
-  function openEditApp(app) {
-    setEditAppTarget(app);
-    setModal('editApp');
-  }
-
-  function resolveOwner(ownerId) {
-    const u = MOCK_USERS.find(u => String(u.id) === ownerId);
-    return u ? { owner: `${u.last_name} ${u.first_name}`, owner_email: u.email } : { owner: null, owner_email: null };
-  }
-
-  async function handleAddApp(e) {
-    e.preventDefault();
-    if (isSubmitting) return;
-
-    try {
-      setIsSubmitting(true);
-      const payload = {
-        name: appForm.name,
-        code: appForm.code.toUpperCase(),
-        description: '',
-        domain: appForm.domain,
-        owner: appForm.ownerId ? parseInt(appForm.ownerId) : null,
-        is_active: appForm.active,
-      };
-
-      await createApplication(payload);
-      pushToast(`Đã tạo ${appForm.code} thành công`, 'success', '✓');
-
-      // Add to local state for immediate UI update
-      const { owner, owner_email } = resolveOwner(appForm.ownerId);
-      setApps(p => [{
-        id: Date.now(),
-        code: appForm.code.toUpperCase(),
-        name: appForm.name,
-        domain: appForm.domain,
-        dept: '—',
-        owner,
-        owner_email,
-        active: appForm.active,
-      }, ...p]);
-
-      setModal(null);
-      setPage(1);
-    } catch (err) {
-      console.error('Lỗi tạo app:', err);
-      pushToast(err.message || 'Không thể tạo application', 'error', '✕');
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function handleEditApp(e) {
-    e.preventDefault();
-    if (isSubmitting) return;
-
-    try {
-      setIsSubmitting(true);
-      const payload = {
-        name: appForm.name,
-        code: appForm.code.toUpperCase(),
-        description: '',
-        domain: appForm.domain,
-        owner: appForm.ownerId ? parseInt(appForm.ownerId) : null,
-        is_active: appForm.active,
-      };
-
-      await updateApplication(editAppTarget.id, payload);
-      pushToast(`Đã cập nhật ${appForm.code} thành công`, 'success', '✓');
-
-      const { owner, owner_email } = resolveOwner(appForm.ownerId);
-      setApps(p => p.map(a => a.id === editAppTarget.id ? {
-        ...a,
-        name: appForm.name,
-        code: appForm.code.toUpperCase(),
-        domain: appForm.domain,
-        owner,
-        owner_email,
-        active: appForm.active,
-      } : a));
-
-      setModal(null);
-    } catch (err) {
-      console.error('Lỗi sửa app:', err);
-      pushToast(err.message || 'Không thể cập nhật application', 'error', '✕');
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function handleDeleteApp(id) {
-    if (!confirm('Bạn có chắc muốn xóa application này?')) return;
-
-    try {
-      await deleteApplication(id);
-      pushToast('Đã xóa application thành công', 'success', '✓');
-      setApps(p => p.filter(a => a.id !== id));
-    } catch (err) {
-      console.error('Lỗi xóa app:', err);
-      pushToast(err.message || 'Không thể xóa application', 'error', '✕');
-    }
-  }
-
-  // ── Shared form sections ──────────────────────────────────────
 
   function DomainFormFields() {
     return (
@@ -321,170 +415,56 @@ function AppTable() {
     );
   }
 
-  function AppFormFields({ showActive }) {
-    // Filter domains based on selected department
-    const filteredDomains = appForm.department
-      ? allDomains.filter(d => String(d.department) === String(appForm.department))
-      : [];
-
-    return (
-      <>
-        <div className={styles.formGroup}>
-          <label className={styles.formLabel}>Tên ứng dụng <span className={styles.required}>*</span></label>
-          <input className={styles.formInput} type="text" placeholder="VD: Hệ thống VPN nội bộ" required autoFocus
-            value={appForm.name} onChange={e => setAppForm(p => ({ ...p, name: e.target.value }))} disabled={isSubmitting} />
-        </div>
-        <div className={styles.formGroup}>
-          <label className={styles.formLabel}>Mã app <span className={styles.required}>*</span></label>
-          <input className={styles.formInput} type="text" placeholder="VD: VPN" required
-            value={appForm.code} onChange={e => setAppForm(p => ({ ...p, code: e.target.value.toUpperCase() }))} disabled={isSubmitting} />
-        </div>
-        <div className={styles.formGroup}>
-          <label className={styles.formLabel}>PNL (Phòng ban) <span className={styles.required}>*</span></label>
-          <select className={styles.formSelect} value={appForm.department} onChange={e => setAppForm(p => ({ ...p, department: e.target.value, domain: '' }))} required disabled={isSubmitting}>
-            <option value="">-- Chọn PNL --</option>
-            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-        </div>
-        <div className={styles.formGroup}>
-          <label className={styles.formLabel}>Domain <span className={styles.required}>*</span></label>
-          <select className={styles.formSelect} value={appForm.domain} onChange={e => setAppForm(p => ({ ...p, domain: e.target.value }))} required disabled={isSubmitting || !appForm.department}>
-            <option value="">-- Chọn Domain --</option>
-            {filteredDomains.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-          {!appForm.department && <small style={{ color: 'var(--text-secondary)', marginTop: 4 }}>Hãy chọn PNL trước</small>}
-        </div>
-        <div className={styles.formGroup}>
-          <label className={styles.formLabel}>Owner quản lý <OptLabel /></label>
-          <select className={styles.formSelect} value={appForm.ownerId} onChange={e => setAppForm(p => ({ ...p, ownerId: e.target.value }))} disabled={isSubmitting}>
-            <option value="">— Chưa phân quyền —</option>
-            {MOCK_USERS.map(u => (
-              <option key={u.id} value={String(u.id)}>
-                {u.last_name} {u.first_name} ({u.email})
-              </option>
-            ))}
-          </select>
-        </div>
-        {showActive && (
-          <div className={styles.formGroup} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <input type="checkbox" id="chkActive" checked={appForm.active}
-              onChange={e => setAppForm(p => ({ ...p, active: e.target.checked }))}
-              disabled={isSubmitting}
-              style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--color-red)' }} />
-            <label htmlFor="chkActive" className={styles.formLabel} style={{ cursor: 'pointer', textTransform: 'none', letterSpacing: 0 }}>
-              Đang hoạt động
-            </label>
-          </div>
-        )}
-      </>
-    );
-  }
-
   return (
     <div>
-      {/* ── Toolbar ── */}
       <div className={styles.mgmtToolbar}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          <span className={styles.mgmtToolbarLabel}>Domain</span>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-            {domains.map(d => (
-              <span key={d.id} className={styles.mgmtDomainChip}
-                style={{ cursor: 'pointer' }}
-                onClick={() => openEditDomain(d)}
-                title="Click để sửa domain"
-              >
-                {d.code}
-                <button className={styles.mgmtChipRemove}
-                  onClick={e => { e.stopPropagation(); handleDeleteDomain(d.id); }}
-                  title="Xóa domain"
-                >×</button>
-              </span>
-            ))}
-          </div>
-          <button className={styles.mgmtAddIconBtn} title="Thêm domain" onClick={openAddDomain}>
-            <span style={{ fontSize: 16, lineHeight: 1 }}>+</span>
-          </button>
-        </div>
-
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div className={styles.searchBox} style={{ maxWidth: 240 }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0, color: 'var(--text-secondary)' }}>
               <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
             </svg>
-            <input
-              className={styles.searchInput}
-              placeholder="Tìm app, mã, domain…"
-              value={search}
-              onChange={e => { setSearch(e.target.value); setPage(1); }}
-            />
+            <input className={styles.searchInput} placeholder="Tìm mã, tên domain…"
+              value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <button className={styles.mgmtAddBtn} onClick={openAddApp}>+ Thêm app</button>
+          <span className={styles.mgmtCount}>{filtered.length} domain</span>
         </div>
+        <button className={styles.mgmtAddBtn} onClick={openAddDomain}>+ Thêm domain</button>
       </div>
 
-      {/* ── App table ── */}
       <div className={styles.mgmtTableWrap}>
         <table className={styles.mgmtTable}>
           <thead>
             <tr>
-              <th>Mã App</th>
-              <th>Tên ứng dụng</th>
-              <th>Domain</th>
-              <th>Phòng ban</th>
-              <th>Owner</th>
-              <th>Trạng thái</th>
-              <th style={{ width: 72 }}></th>
+              <th>Mã Domain</th><th>Tên</th><th>Mô tả</th><th>Admin quản lý</th>
+              <th>Số app</th><th style={{ width: 72 }}></th>
             </tr>
           </thead>
           <tbody>
-            {paged.length > 0 ? paged.map(app => (
-              <tr key={app.id} className={styles.mgmtRow}>
-                <td><strong style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: '0.8rem' }}>{app.code}</strong></td>
-                <td>{app.name}</td>
-                <td><span className={styles.mgmtDomainTag}>{app.domain}</span></td>
-                <td style={{ color: 'var(--text-secondary)', fontSize: '0.84rem' }}>{app.dept}</td>
+            {filtered.length > 0 ? filtered.map(d => (
+              <tr key={d.id} className={styles.mgmtRow}>
+                <td><span className={styles.mgmtDomainTag} style={{ fontFamily: 'IBM Plex Mono, monospace' }}>{d.code}</span></td>
+                <td style={{ fontSize: '0.88rem' }}>{d.name || <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>—</span>}</td>
+                <td style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', maxWidth: 220 }}>{d.description || <span style={{ fontStyle: 'italic' }}>—</span>}</td>
+                <td style={{ fontSize: '0.83rem', color: 'var(--text-secondary)' }}>{d.admin || <span style={{ fontStyle: 'italic' }}>Chưa phân quyền</span>}</td>
                 <td>
-                  {app.owner
-                    ? <div><div style={{ fontSize: '0.84rem' }}>{app.owner}</div><div style={{ fontSize: '0.73rem', color: 'var(--text-secondary)' }}>{app.owner_email}</div></div>
-                    : <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.8rem' }}>Chưa phân quyền</span>
-                  }
-                </td>
-                <td>
-                  <span className={styles.mgmtBadge} style={app.active
-                    ? { background: 'rgba(46,204,113,0.12)', color: '#2ecc71' }
-                    : { background: 'rgba(160,154,185,0.1)', color: 'var(--text-secondary)' }
-                  }>{app.active ? '● Hoạt động' : '○ Tạm dừng'}</span>
+                  <span className={styles.mgmtBadge} style={{ background: 'rgba(139,133,193,0.13)', color: '#a09ab9' }}>
+                    {apps.filter(a => a.domain === d.code).length} app
+                  </span>
                 </td>
                 <td>
                   <div style={{ display: 'flex', gap: 4 }}>
-                    <IconBtn title="Sửa" onClick={() => openEditApp(app)}><EditIcon /></IconBtn>
-                    <IconBtn title="Xóa" danger onClick={() => handleDeleteApp(app.id)}><DeleteIcon /></IconBtn>
+                    <IconBtn title="Sửa" onClick={() => openEditDomain(d)}><EditIcon /></IconBtn>
+                    <IconBtn title="Xóa" danger onClick={() => setConfirmDelete({ id: d.id, label: d.code })}><DeleteIcon /></IconBtn>
                   </div>
                 </td>
               </tr>
             )) : (
-              <tr><td colSpan={7} className={styles.mgmtEmpty}>Không tìm thấy ứng dụng nào.</td></tr>
+              <tr><td colSpan={6} className={styles.mgmtEmpty}>Không tìm thấy domain nào.</td></tr>
             )}
           </tbody>
         </table>
-
-        {totalPages > 1 && (
-          <div className={styles.mgmtPagination}>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-              {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} / {filtered.length}
-            </span>
-            <div style={{ display: 'flex', gap: 4 }}>
-              <button className={styles.mgmtPageBtn} disabled={page === 1} onClick={() => setPage(p => p - 1)}>‹</button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-                <button key={p} className={`${styles.mgmtPageBtn} ${p === page ? styles.mgmtPageBtnActive : ''}`} onClick={() => setPage(p)}>{p}</button>
-              ))}
-              <button className={styles.mgmtPageBtn} disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>›</button>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* ── Modal: Thêm domain ── */}
       {modal === 'addDomain' && (
         <div className={styles.modalBackdrop} onClick={() => setModal(null)}>
           <div className={styles.modalBox} onClick={e => e.stopPropagation()} style={{ maxWidth: 380 }}>
@@ -503,7 +483,6 @@ function AppTable() {
         </div>
       )}
 
-      {/* ── Modal: Sửa domain ── */}
       {modal === 'editDomain' && editDomainTarget && (
         <div className={styles.modalBackdrop} onClick={() => setModal(null)}>
           <div className={styles.modalBox} onClick={e => e.stopPropagation()} style={{ maxWidth: 380 }}>
@@ -522,70 +501,86 @@ function AppTable() {
         </div>
       )}
 
-      {/* ── Modal: Thêm app ── */}
-      {modal === 'addApp' && (
-        <div className={styles.modalBackdrop} onClick={() => setModal(null)}>
-          <div className={styles.modalBox} onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
-            <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>Thêm ứng dụng</h3>
-              <button className={styles.modalClose} onClick={() => setModal(null)} disabled={isSubmitting}>✕</button>
-            </div>
-            <form className={styles.modalForm} onSubmit={handleAddApp}>
-              <AppFormFields showActive={false} />
-              <div className={styles.modalActions}>
-                <button type="button" className={styles.btnSecondary} onClick={() => setModal(null)} disabled={isSubmitting}>Hủy</button>
-                <button type="submit" className={styles.btnPrimary} disabled={isSubmitting}>{isSubmitting ? 'Đang thêm...' : 'Thêm'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ── Modal: Sửa app ── */}
-      {modal === 'editApp' && editAppTarget && (
-        <div className={styles.modalBackdrop} onClick={() => setModal(null)}>
-          <div className={styles.modalBox} onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
-            <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>Sửa: {editAppTarget.code}</h3>
-              <button className={styles.modalClose} onClick={() => setModal(null)} disabled={isSubmitting}>✕</button>
-            </div>
-            <form className={styles.modalForm} onSubmit={handleEditApp}>
-              <AppFormFields showActive={true} />
-              <div className={styles.modalActions}>
-                <button type="button" className={styles.btnSecondary} onClick={() => setModal(null)} disabled={isSubmitting}>Hủy</button>
-                <button type="submit" className={styles.btnPrimary} disabled={isSubmitting}>{isSubmitting ? 'Đang lưu...' : 'Lưu thay đổi'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {confirmDelete && (
+        <ConfirmModal
+          label={confirmDelete.label}
+          onCancel={() => setConfirmDelete(null)}
+          onConfirm={() => { setDomains(p => p.filter(d => d.id !== confirmDelete.id)); setConfirmDelete(null); }}
+        />
       )}
     </div>
   );
 }
 
-// ── User list tab ───────────────────────────────────────────────
+// ── User management ──────────────────────────────────────────────
 
-function UserTable() {
-  const [search, setSearch] = useState('');
+const EMPTY_USER_FORM = { last_name: '', first_name: '', email: '', password: '', roles: [] };
+
+function UserTable({ users, setUsers }) {
+  const [search, setSearch]               = useState('');
+  const [modal, setModal]                 = useState(null); // null | 'addUser' | 'editUser'
+  const [userForm, setUserForm]           = useState(EMPTY_USER_FORM);
+  const [editUserTarget, setEditUserTarget] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   const filtered = search
-    ? MOCK_USERS.filter(u =>
+    ? users.filter(u =>
         `${u.last_name} ${u.first_name}`.toLowerCase().includes(search.toLowerCase()) ||
         u.email.toLowerCase().includes(search.toLowerCase())
       )
-    : MOCK_USERS;
+    : users;
+
+  function toggleRole(role) {
+    setUserForm(p => ({
+      ...p,
+      roles: p.roles.includes(role) ? p.roles.filter(r => r !== role) : [...p.roles, role],
+    }));
+  }
+
+  function openEditUser(u) {
+    setEditUserTarget(u);
+    setUserForm({ last_name: u.last_name, first_name: u.first_name, email: u.email, password: '', roles: u.roles });
+    setModal('editUser');
+  }
+
+  function handleAddUser(e) {
+    e.preventDefault();
+    setUsers(p => [...p, {
+      id: Date.now(),
+      last_name: userForm.last_name,
+      first_name: userForm.first_name,
+      email: userForm.email,
+      roles: userForm.roles,
+    }]);
+    setUserForm(EMPTY_USER_FORM);
+    setModal(null);
+  }
+
+  function handleEditUser(e) {
+    e.preventDefault();
+    setUsers(p => p.map(u => u.id === editUserTarget.id
+      ? { ...u, last_name: userForm.last_name, first_name: userForm.first_name, email: userForm.email, roles: userForm.roles }
+      : u
+    ));
+    setModal(null);
+  }
 
   return (
     <div>
       <div className={styles.mgmtToolbar}>
-        <div className={styles.searchBox} style={{ maxWidth: 280 }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0, color: 'var(--text-secondary)' }}>
-            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-          </svg>
-          <input className={styles.searchInput} placeholder="Tìm tên, email…"
-            value={search} onChange={e => setSearch(e.target.value)} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className={styles.searchBox} style={{ maxWidth: 280 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0, color: 'var(--text-secondary)' }}>
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            <input className={styles.searchInput} placeholder="Tìm tên, email…"
+              value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+          <span className={styles.mgmtCount}>{filtered.length} người dùng</span>
         </div>
-        <span className={styles.mgmtCount}>{filtered.length} người dùng</span>
+        <button className={styles.mgmtAddBtn} onClick={() => { setUserForm(EMPTY_USER_FORM); setModal('addUser'); }}>
+          + Tạo user
+        </button>
       </div>
 
       <div className={styles.mgmtTableWrap}>
@@ -595,6 +590,7 @@ function UserTable() {
               <th>Họ tên</th>
               <th>Email</th>
               <th>Vai trò</th>
+              <th style={{ width: 72 }}></th>
             </tr>
           </thead>
           <tbody>
@@ -610,15 +606,142 @@ function UserTable() {
                 </td>
                 <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{u.email}</td>
                 <td>
-                  <span className={styles.mgmtBadge} style={ROLE_COLOR[u.role] ?? {}}>
-                    {ROLE_LABEL[u.role] ?? u.role}
-                  </span>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    {u.roles.includes('sub-admin') && (
+                      <span className={styles.mgmtBadge} style={{ background: 'rgba(222,26,26,0.11)', color: '#ff6b6b' }}>Admin</span>
+                    )}
+                    {u.roles.includes('owner') && (
+                      <span className={styles.mgmtBadge} style={{ background: 'rgba(46,204,113,0.12)', color: '#2ecc71' }}>Owner</span>
+                    )}
+                  </div>
+                </td>
+                <td>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <IconBtn title="Sửa" onClick={() => openEditUser(u)}><EditIcon /></IconBtn>
+                    <IconBtn title="Xóa" danger onClick={() => setConfirmDelete({ id: u.id, label: `${u.last_name} ${u.first_name}` })}><DeleteIcon /></IconBtn>
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {confirmDelete && (
+        <ConfirmModal
+          label={confirmDelete.label}
+          onCancel={() => setConfirmDelete(null)}
+          onConfirm={() => { setUsers(p => p.filter(u => u.id !== confirmDelete.id)); setConfirmDelete(null); }}
+        />
+      )}
+
+      {/* Modal: Tạo user */}
+      {modal === 'addUser' && (
+        <div className={styles.modalBackdrop} onClick={() => setModal(null)}>
+          <div className={styles.modalBox} onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>Tạo Tài Khoản</h3>
+              <button className={styles.modalClose} onClick={() => setModal(null)}>✕</button>
+            </div>
+            <form className={styles.modalForm} onSubmit={handleAddUser}>
+              <div className={styles.formRow}>
+                <div className={styles.formGroup} style={{ flex: 1 }}>
+                  <label className={styles.formLabel}>Họ <span className={styles.required}>*</span></label>
+                  <input className={styles.formInput} type="text" placeholder="Nguyễn" required autoFocus
+                    value={userForm.last_name} onChange={e => setUserForm(p => ({ ...p, last_name: e.target.value }))} />
+                </div>
+                <div className={styles.formGroup} style={{ flex: 1 }}>
+                  <label className={styles.formLabel}>Tên <span className={styles.required}>*</span></label>
+                  <input className={styles.formInput} type="text" placeholder="Văn A" required
+                    value={userForm.first_name} onChange={e => setUserForm(p => ({ ...p, first_name: e.target.value }))} />
+                </div>
+              </div>
+              <div className={styles.formGroup}>
+                <label className={styles.formLabel}>Email <span className={styles.required}>*</span></label>
+                <input className={styles.formInput} type="email" placeholder="user@company.com" required
+                  value={userForm.email} onChange={e => setUserForm(p => ({ ...p, email: e.target.value }))} />
+              </div>
+              <div className={styles.formGroup}>
+                <label className={styles.formLabel}>Mật khẩu <span className={styles.required}>*</span></label>
+                <input className={styles.formInput} type="password" placeholder="Tối thiểu 8 ký tự" required
+                  value={userForm.password} onChange={e => setUserForm(p => ({ ...p, password: e.target.value }))} />
+              </div>
+              <div className={styles.formGroup}>
+                <label className={styles.formLabel}>Vai trò <OptLabel /></label>
+                <div style={{ display: 'flex', gap: 16, paddingTop: 4 }}>
+                  {[
+                    { key: 'owner',     label: 'Owner' },
+                    { key: 'sub-admin', label: 'Admin' },
+                  ].map(r => (
+                    <label key={r.key} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text-primary)' }}>
+                      <input type="checkbox" checked={userForm.roles.includes(r.key)} onChange={() => toggleRole(r.key)}
+                        style={{ width: 15, height: 15, accentColor: 'var(--color-red)', cursor: 'pointer' }} />
+                      {r.label}
+                    </label>
+                  ))}
+                </div>
+                <p style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+                  Không chọn = mặc định Requester (không hiển thị vai trò)
+                </p>
+              </div>
+              <div className={styles.modalActions}>
+                <button type="button" className={styles.btnSecondary} onClick={() => setModal(null)}>Hủy</button>
+                <button type="submit" className={styles.btnPrimary}>Tạo tài khoản</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Sửa user */}
+      {modal === 'editUser' && editUserTarget && (
+        <div className={styles.modalBackdrop} onClick={() => setModal(null)}>
+          <div className={styles.modalBox} onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>Sửa: {editUserTarget.last_name} {editUserTarget.first_name}</h3>
+              <button className={styles.modalClose} onClick={() => setModal(null)}>✕</button>
+            </div>
+            <form className={styles.modalForm} onSubmit={handleEditUser}>
+              <div className={styles.formRow}>
+                <div className={styles.formGroup} style={{ flex: 1 }}>
+                  <label className={styles.formLabel}>Họ <span className={styles.required}>*</span></label>
+                  <input className={styles.formInput} type="text" required autoFocus
+                    value={userForm.last_name} onChange={e => setUserForm(p => ({ ...p, last_name: e.target.value }))} />
+                </div>
+                <div className={styles.formGroup} style={{ flex: 1 }}>
+                  <label className={styles.formLabel}>Tên <span className={styles.required}>*</span></label>
+                  <input className={styles.formInput} type="text" required
+                    value={userForm.first_name} onChange={e => setUserForm(p => ({ ...p, first_name: e.target.value }))} />
+                </div>
+              </div>
+              <div className={styles.formGroup}>
+                <label className={styles.formLabel}>Email <span className={styles.required}>*</span></label>
+                <input className={styles.formInput} type="email" required
+                  value={userForm.email} onChange={e => setUserForm(p => ({ ...p, email: e.target.value }))} />
+              </div>
+              <div className={styles.formGroup}>
+                <label className={styles.formLabel}>Vai trò <OptLabel /></label>
+                <div style={{ display: 'flex', gap: 16, paddingTop: 4 }}>
+                  {[
+                    { key: 'owner',     label: 'Owner' },
+                    { key: 'sub-admin', label: 'Admin' },
+                  ].map(r => (
+                    <label key={r.key} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text-primary)' }}>
+                      <input type="checkbox" checked={userForm.roles.includes(r.key)} onChange={() => toggleRole(r.key)}
+                        style={{ width: 15, height: 15, accentColor: 'var(--color-red)', cursor: 'pointer' }} />
+                      {r.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className={styles.modalActions}>
+                <button type="button" className={styles.btnSecondary} onClick={() => setModal(null)}>Hủy</button>
+                <button type="submit" className={styles.btnPrimary}>Lưu thay đổi</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -626,7 +749,10 @@ function UserTable() {
 // ── TabManage export ────────────────────────────────────────────
 
 export function TabManage({ onBack }) {
-  const [tab, setTab] = useState('app');
+  const [tab, setTab]         = useState('app');
+  const [apps, setApps]       = useState(INIT_APPS);
+  const [domains, setDomains] = useState(INIT_DOMAINS);
+  const [users, setUsers]     = useState(INIT_USERS);
 
   return (
     <div>
@@ -638,30 +764,27 @@ export function TabManage({ onBack }) {
                 <polyline points="15 18 9 12 15 6"/>
               </svg>
             </button>
-            <div>
-              <h2 className={styles.panelTitle}>Quản lý hệ thống</h2>
-            </div>
+            <h2 className={styles.panelTitle}>Quản lý hệ thống</h2>
           </div>
         </div>
 
         <div className={styles.subTabs} style={{ marginBottom: 0 }}>
-          <button
-            className={`${styles.subTab} ${tab === 'app' ? styles.subTabActive : ''}`}
-            onClick={() => setTab('app')}
-          >
-            Quản lý app
-          </button>
-          <button
-            className={`${styles.subTab} ${tab === 'user' ? styles.subTabActive : ''}`}
-            onClick={() => setTab('user')}
-          >
-            Quản lý user
-          </button>
+          {[
+            { key: 'app',    label: 'Quản lý app'    },
+            { key: 'domain', label: 'Quản lý domain' },
+            { key: 'user',   label: 'Quản lý user'   },
+          ].map(t => (
+            <button key={t.key}
+              className={`${styles.subTab} ${tab === t.key ? styles.subTabActive : ''}`}
+              onClick={() => setTab(t.key)}
+            >{t.label}</button>
+          ))}
         </div>
       </div>
 
-      {tab === 'app'  && <AppTable  />}
-      {tab === 'user' && <UserTable />}
+      {tab === 'app'    && <AppTable    apps={apps}       setApps={setApps}       domains={domains} />}
+      {tab === 'domain' && <DomainTable domains={domains} setDomains={setDomains} apps={apps} setApps={setApps} />}
+      {tab === 'user'   && <UserTable   users={users}     setUsers={setUsers} />}
     </div>
   );
 }

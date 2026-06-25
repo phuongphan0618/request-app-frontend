@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import styles from './App.module.css';
-import { MOCK_APP_OWNERS, MOCK_USER, genId } from './data';
-import { fmtDate, fmtDateTime, StatusBadge } from './helpers';
+import { MOCK_USER, genId } from './data';
+import { fmtDate, fmtDateTime, StatusBadge, useToasts, ToastStack } from './helpers';
 import { ClockIcon } from './TabAdmin';
 import { getDepartments, getDomains, getApplications, createRequest } from '../../lib/api';
 
@@ -22,7 +22,6 @@ function stepState(idx, activeStep, failed) {
   return 'pending';
 }
 
-
 function getItemProgress(reqStatus, itemStatus) {
   if (reqStatus === 'pending_admin')     return { activeStep: 1, failed: false };
   if (reqStatus === 'rejected_by_admin') return { activeStep: 1, failed: true };
@@ -35,8 +34,7 @@ function getItemProgress(reqStatus, itemStatus) {
 const DOT = { done: styles.dotDone, active: styles.dotActive, failed: styles.dotFailed, pending: styles.dotPending };
 const LBL = { done: styles.lblDone, active: styles.lblActive, failed: styles.lblFailed, pending: styles.lblPending };
 
-
-function ProgressStepperCore({ activeStep, failed, failLabel }) {
+function ProgressStepperCore({ activeStep, failed, failLabel, showLabels = true }) {
   return (
     <div className={styles.progressStepper}>
       {STEPS.map((step, i) => {
@@ -58,8 +56,11 @@ function ProgressStepperCore({ activeStep, failed, failLabel }) {
                   </svg>
                 )}
                 {state === 'active' && <span className={styles.dotPulse} />}
+                {!showLabels && <span className={styles.progressTooltip}>{label}</span>}
               </div>
-              <span className={`${styles.progressLabel} ${LBL[state]}`}>{label}</span>
+              {showLabels && (
+                <span className={`${styles.progressLabel} ${LBL[state]}`}>{label}</span>
+              )}
             </div>
             {!isLast && (
               <div className={`${styles.progressLine} ${i < activeStep ? styles.progressLineDone : ''}`} />
@@ -77,6 +78,15 @@ function ItemProgressStepper({ reqStatus, itemStatus }) {
   return <ProgressStepperCore activeStep={activeStep} failed={failed} failLabel={failLabel} />;
 }
 
+// Map status → activeStep for the mini card stepper
+function statusToStep(status) {
+  if (status === 'pending_admin')     return { activeStep: 1, failed: false };
+  if (status === 'pending_owner')     return { activeStep: 2, failed: false };
+  if (status === 'completed')         return { activeStep: 4, failed: false };
+  if (status === 'rejected_by_admin') return { activeStep: 1, failed: true  };
+  return { activeStep: 1, failed: false };
+}
+
 // ── Pagination ───────────────────────────────────────────────
 
 function Pagination({ page, total, pageSize, onChange }) {
@@ -91,33 +101,188 @@ function Pagination({ page, total, pageSize, onChange }) {
   );
 }
 
+// ── Cancel modal ─────────────────────────────────────────────
+
+function CancelModal({ req, reasonRequired, onConfirm, onClose }) {
+  const [reason, setReason] = useState('');
+  function handleSubmit(e) {
+    e.preventDefault();
+    onConfirm(reason);
+  }
+  return (
+    <div className={styles.modalBackdrop} onClick={onClose}>
+      <div className={styles.modalBox} onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
+        <div className={styles.modalHeader}>
+          <h3 className={styles.modalTitle}>Hủy yêu cầu {req.id}</h3>
+          <button className={styles.modalClose} onClick={onClose}>✕</button>
+        </div>
+        <form className={styles.modalForm} onSubmit={handleSubmit}>
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel}>
+              Lý do hủy&nbsp;
+              {reasonRequired
+                ? <span className={styles.required}>*</span>
+                : <span style={{ opacity: 0.45, fontWeight: 400, fontSize: '0.75rem' }}>(tuỳ chọn)</span>
+              }
+            </label>
+            <textarea className={styles.formInput} rows={3} required={reasonRequired}
+              placeholder="Cho chúng tôi biết lý do bạn muốn hủy…"
+              value={reason} onChange={e => setReason(e.target.value)}
+              style={{ resize: 'none' }} />
+          </div>
+          <div className={styles.modalActions}>
+            <button type="submit" className={styles.btnPrimary}>Xác nhận hủy</button>
+            <button type="button" className={styles.btnSecondary} onClick={onClose}>Giữ lại</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Dispute modal ─────────────────────────────────────────────
+
+function DisputeModal({ req, onConfirm, onClose }) {
+  const [reason, setReason] = useState('');
+  return (
+    <div className={styles.modalBackdrop} onClick={onClose}>
+      <div className={styles.modalBox} onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+        <div className={styles.modalHeader}>
+          <h3 className={styles.modalTitle}>Khiếu nại yêu cầu {req.id}</h3>
+          <button className={styles.modalClose} onClick={onClose}>✕</button>
+        </div>
+        <div className={styles.modalForm}>
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel}>
+              Lý do khiếu nại&nbsp;
+              <span style={{ opacity: 0.45, fontWeight: 400, fontSize: '0.75rem' }}>(tuỳ chọn)</span>
+            </label>
+            <textarea className={styles.formInput} rows={3}
+              placeholder="Mô tả vấn đề bạn gặp phải…"
+              value={reason} onChange={e => setReason(e.target.value)}
+              style={{ resize: 'none' }} />
+          </div>
+          <div style={{
+            marginBottom: 16, padding: '10px 12px',
+            borderRadius: 8,
+            background: 'rgba(222,26,26,0.07)',
+            border: '1px solid rgba(222,26,26,0.18)',
+            fontSize: '0.79rem', color: 'var(--text-secondary)', lineHeight: 1.65,
+          }}>
+            <span style={{ color: '#ff6b6b', fontWeight: 600 }}>Lưu ý: </span>
+            Hãy chắc chắn rằng bạn có căn cứ thực sự trước khi gửi khiếu nại. Khiếu nại thiếu cơ sở có thể ảnh hưởng đến mức độ ưu tiên xét duyệt của bạn trong các yêu cầu tương lai.
+          </div>
+          <div className={styles.modalActions}>
+            <button type="button" className={styles.btnPrimary} onClick={() => onConfirm(reason)}>
+              Gửi khiếu nại
+            </button>
+            <button type="button" className={styles.btnSecondary} onClick={onClose}>Hủy</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Left card ─────────────────────────────────────────────────
 
-function ReqCard({ req, isSelected, onClick }) {
+function ReqCard({ req, isSelected, onClick, compact, onCancel, onNudge, onDispute }) {
+  const isPending   = req.status === 'pending_admin';
+  const isApproved  = req.status === 'pending_owner';
+  const isRejected  = req.status === 'rejected_by_admin';
+  const isCompleted = req.status === 'completed';
+  const { activeStep, failed } = statusToStep(req.status);
+
+  const domainBlock = (
+    <span className={styles.cardDomainName}>{req.domain_name}</span>
+  );
+
+  const appChips = (
+    <div className={styles.appTags}>
+      {req.items.slice(0, 2).map(i => <span key={i.id} className={styles.appTag}>{i.application_name}</span>)}
+      {req.items.length > 2 && <span className={styles.appTag}>+{req.items.length - 2}</span>}
+    </div>
+  );
+
   return (
     <div
       className={`${styles.reqSplitCard} ${isSelected ? styles.reqSplitCardSel : ''}`}
       onClick={onClick}
     >
+      {/* Top row: ID | dates (overview) or badge (compact) */}
       <div className={styles.reqSplitCardTop}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span className={styles.reqSplitCardId}>{req.id}</span>
           {req.is_urgent && <ClockIcon />}
         </div>
-        <StatusBadge status={req.status} />
+        {compact ? (
+          <StatusBadge status={req.status} />
+        ) : (
+          <div className={styles.cardDatesCorner}>
+            <div className={styles.cardDateItem}>
+              <span className={styles.cardDateLabel}>Deadline</span>
+              <span className={styles.cardDateVal}>{fmtDate(req.deadline) || '—'}</span>
+            </div>
+            <span className={styles.cardDateDot}>·</span>
+            <div className={styles.cardDateItem}>
+              <span className={styles.cardDateLabel}>Tạo</span>
+              <span className={styles.cardDateVal}>{fmtDate(req.created_at)}</span>
+            </div>
+          </div>
+        )}
       </div>
-      <div className={styles.reqSplitCardMeta}>
-        <span className={styles.reqSplitCardMetaLabel}>Domain</span>
-        <span className={styles.reqSplitCardMetaVal}>{req.domain_name}</span>
-      </div>
-      <div className={styles.appTags} style={{ marginTop: 10 }}>
-        {req.items.slice(0, 2).map(i => <span key={i.id} className={styles.appTag}>{i.application_name}</span>)}
-        {req.items.length > 2 && <span className={styles.appTag}>+{req.items.length - 2}</span>}
-      </div>
-      <div className={styles.reqSplitCardDeadlineRow}>
-        <span className={styles.reqSplitCardDeadlineLabel}>Deadline</span>
-        <span className={styles.reqSplitCardDeadlineVal}>{fmtDate(req.deadline) || '—'}</span>
-      </div>
+
+      {/* Body: compact stacks vertically; overview always 3-col: 1/6 domain | 1/3 apps | 1/2 reason */}
+      {compact ? (
+        <>{domainBlock}{appChips}</>
+      ) : (
+        <div className={styles.cardBodySplit}>
+          <div className={styles.cardBodyDomain}>{domainBlock}</div>
+          <div className={styles.cardBodyApps}>{appChips}</div>
+          <div className={styles.cardRejectSnippet}>
+            {isRejected && (
+              <>
+                <span className={styles.cardRejectSnippetLabel}>Lý do từ chối:</span>
+                <span className={styles.cardRejectSnippetText}>{req.reject_note || '—'}</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Compact: deadline box */}
+      {compact && (
+        <div className={styles.reqSplitCardDeadlineRow}>
+          <span className={styles.reqSplitCardDeadlineLabel}>Deadline</span>
+          <span className={styles.reqSplitCardDeadlineVal}>{fmtDate(req.deadline) || '—'}</span>
+        </div>
+      )}
+
+      {/* Overview footer: progress (left indent) | buttons (far right) */}
+      {!compact && (
+        <div className={styles.cardActionRow} onClick={e => e.stopPropagation()}>
+          <div className={styles.cardProgressWrap}>
+            <ProgressStepperCore activeStep={activeStep} failed={failed} failLabel="Bị từ chối" showLabels={false} />
+          </div>
+          <div className={styles.cardActionBtns}>
+            {isPending && (
+              <>
+                <button className={styles.cardBtnCancel} onClick={() => onCancel(req)}>Hủy</button>
+                <button className={styles.cardBtnNudge}  onClick={() => onNudge(req)}>Thúc!</button>
+              </>
+            )}
+            {isApproved && (
+              <button className={styles.cardBtnCancel} onClick={() => onCancel(req)}>Hủy</button>
+            )}
+            {isRejected && (
+              <button className={styles.cardBtnDispute} onClick={() => onDispute(req)}>Khiếu nại</button>
+            )}
+            {isCompleted && (
+              <button className={styles.cardBtnCancel} onClick={() => onCancel(req)}>Hủy</button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -129,7 +294,6 @@ function ReqDetail({ req }) {
 
   return (
     <div className={styles.reqDetailPane}>
-      {/* Header */}
       <div className={styles.rdHeader}>
         <div className={styles.rdHeaderLeft}>
           <span className={styles.rdId}>{req.id}</span>
@@ -141,10 +305,7 @@ function ReqDetail({ req }) {
         )}
       </div>
 
-      {/* Scrollable body */}
       <div className={styles.rdBody}>
-
-        {/* Thông tin chung + Lý do — cùng hàng */}
         <div className={`${styles.rdSection} ${styles.rdSectionRow}`}>
           <div className={styles.rdSectionCol}>
             <div className={styles.rdSectionTitle}>Thông tin chung</div>
@@ -176,7 +337,6 @@ function ReqDetail({ req }) {
           )}
         </div>
 
-        {/* Ghi chú từ chối */}
         {req.reject_note && (
           <div className={styles.rdSection}>
             <div className={styles.rdSectionTitle}>Ghi chú từ chối</div>
@@ -184,7 +344,6 @@ function ReqDetail({ req }) {
           </div>
         )}
 
-        {/* Danh sách ứng dụng với progress từng item */}
         <div className={styles.rdSection}>
           <div className={styles.rdSectionTitle}>Danh sách ứng dụng ({req.items.length})</div>
           <div className={styles.rdItemList}>
@@ -202,7 +361,6 @@ function ReqDetail({ req }) {
             ))}
           </div>
         </div>
-
       </div>
     </div>
   );
@@ -217,7 +375,6 @@ function CreateRequestModal({ onClose, onCreate }) {
   const [selAppIds, setSelAppIds] = useState([]);
   const [reason, setReason]       = useState('');
   const [deadline, setDeadline]   = useState('');
-  const [isUrgent, setIsUrgent]   = useState(false);
   const [error, setError]         = useState('');
   const [loading, setLoading]     = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -281,7 +438,7 @@ function CreateRequestModal({ onClose, onCreate }) {
         created_at: new Date().toISOString(),
         deadline: deadline || null,
         status: 'pending_admin',
-        is_urgent: isUrgent,
+        is_urgent: false,
         requester_name: MOCK_USER.name,
         requester_email: MOCK_USER.email,
         department_name: selectedDept?.name || '',
@@ -369,10 +526,6 @@ function CreateRequestModal({ onClose, onCreate }) {
               <div className={styles.formGroup}>
                 <label className={styles.formLabel}>Thời hạn xử lý</label>
                 <input type="date" className={styles.formDate} value={deadline} onChange={e => setDeadline(e.target.value)} min={new Date().toISOString().split('T')[0]} />
-                <label className={styles.urgentCheck}>
-                  <input type="checkbox" checked={isUrgent} onChange={e => setIsUrgent(e.target.checked)} />
-                  <span>Yêu cầu gấp</span>
-                </label>
               </div>
             </div>
 
@@ -398,12 +551,6 @@ function CreateRequestModal({ onClose, onCreate }) {
               </div>
               {reason   && <div className={styles.confirmRow}><span className={styles.confirmLabel}>Lý do</span><span className={styles.confirmValue}>{reason}</span></div>}
               {deadline && <div className={styles.confirmRow}><span className={styles.confirmLabel}>Thời hạn</span><span className={styles.confirmValue}>{fmtDate(deadline)}</span></div>}
-              {isUrgent && (
-                <div className={styles.confirmRow}>
-                  <span className={styles.confirmLabel}>Mức độ</span>
-                  <ClockIcon />
-                </div>
-              )}
             </div>
             <div className={styles.modalActions}>
               <button type="button" className={styles.btnSecondary} onClick={() => setStep('form')} disabled={submitting}>← Sửa lại</button>
@@ -421,21 +568,67 @@ function CreateRequestModal({ onClose, onCreate }) {
 const PAGE_SIZE = 3;
 
 export function TabRequester({ myRequests, onCreate }) {
+  const { toasts, push }          = useToasts();
   const [sub, setSub]             = useState('active');
   const [showModal, setShowModal] = useState(false);
   const [selected, setSelected]   = useState(null);
   const [page, setPage]           = useState(1);
 
-  const active = myRequests.filter(r => r.status === 'pending_admin' || r.status === 'pending_owner');
-  const done   = myRequests.filter(r => r.status === 'completed' || r.status === 'rejected_by_admin');
+  // Track locally-cancelled request IDs
+  const [cancelledIds, setCancelledIds] = useState(new Set());
+
+  // Action modals
+  const [cancelTarget, setCancelTarget]   = useState(null); // { req, reasonRequired }
+  const [disputeTarget, setDisputeTarget] = useState(null); // req
+
+  const compact = !!selected; // cards are compact when detail pane is open
+
+  const displayReqs = myRequests.filter(r => !cancelledIds.has(r.id));
+  const active = displayReqs.filter(r => r.status === 'pending_admin' || r.status === 'pending_owner');
+  const done   = displayReqs.filter(r => r.status === 'completed'    || r.status === 'rejected_by_admin');
   const rows   = sub === 'active' ? active : done;
   const paged  = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   function handleTabChange(key) { setSub(key); setSelected(null); setPage(1); }
 
+  function handleNudge(req) {
+    push(`Đã gửi nhắc nhở đến admin cho yêu cầu ${req.id}`, 'success', '🔔');
+  }
+
+  function handleCancelConfirm(_reason) {
+    setCancelledIds(p => new Set([...p, cancelTarget.req.id]));
+    if (selected?.id === cancelTarget.req.id) setSelected(null);
+    push(`Đã hủy yêu cầu ${cancelTarget.req.id}`, 'info', '↩');
+    setCancelTarget(null);
+  }
+
+  function handleDisputeConfirm(_reason) {
+    push(`Đã gửi khiếu nại cho yêu cầu ${disputeTarget.id}`, 'success', '📨');
+    setDisputeTarget(null);
+  }
+
   return (
     <div>
       {showModal && <CreateRequestModal onClose={() => setShowModal(false)} onCreate={onCreate} />}
+
+      {cancelTarget && (
+        <CancelModal
+          req={cancelTarget.req}
+          reasonRequired={cancelTarget.reasonRequired}
+          onConfirm={handleCancelConfirm}
+          onClose={() => setCancelTarget(null)}
+        />
+      )}
+
+      {disputeTarget && (
+        <DisputeModal
+          req={disputeTarget}
+          onConfirm={handleDisputeConfirm}
+          onClose={() => setDisputeTarget(null)}
+        />
+      )}
+
+      <ToastStack toasts={toasts} />
 
       <div className={styles.panelHeader}>
         <div>
@@ -465,8 +658,11 @@ export function TabRequester({ myRequests, onCreate }) {
       </div>
 
       <div className={styles.reqSplitPane}>
-        {/* Left: card list + pagination */}
-        <div className={styles.reqCardList}>
+        {/* Left: framed panel containing the scrollable card list */}
+        <div
+          className={styles.cardListPanel}
+          style={compact ? {} : { width: '100%' }}
+        >
           {rows.length === 0 ? (
             <div className={styles.emptyState} style={{ padding: '2rem 1rem' }}>
               <div className={styles.emptyIcon}>📭</div>
@@ -474,32 +670,30 @@ export function TabRequester({ myRequests, onCreate }) {
             </div>
           ) : (
             <>
-              {paged.map(req => (
-                <ReqCard
-                  key={req.id}
-                  req={req}
-                  isSelected={selected?.id === req.id}
-                  onClick={() => setSelected(p => p?.id === req.id ? null : req)}
-                />
-              ))}
+              <div className={styles.reqCardList}>
+                {paged.map(req => (
+                  <ReqCard
+                    key={req.id}
+                    req={req}
+                    isSelected={selected?.id === req.id}
+                    onClick={() => setSelected(p => p?.id === req.id ? null : req)}
+                    compact={compact}
+                    onCancel={r => setCancelTarget({
+                      req: r,
+                      reasonRequired: r.status === 'pending_owner',
+                    })}
+                    onNudge={handleNudge}
+                    onDispute={r => setDisputeTarget(r)}
+                  />
+                ))}
+              </div>
               <Pagination page={page} total={rows.length} pageSize={PAGE_SIZE} onChange={setPage} />
             </>
           )}
         </div>
 
-        {/* Right: detail or placeholder */}
-        {selected ? (
-          <ReqDetail key={selected.id} req={selected} />
-        ) : (
-          <div className={styles.reqDetailEmpty}>
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
-            </svg>
-            <span>Chọn một yêu cầu để xem chi tiết</span>
-          </div>
-        )}
+        {/* Right: detail pane — only when a card is selected */}
+        {selected && <ReqDetail key={selected.id} req={selected} />}
       </div>
     </div>
   );

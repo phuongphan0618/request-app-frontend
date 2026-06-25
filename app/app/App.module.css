@@ -583,7 +583,7 @@
 .appTags { display: flex; flex-wrap: wrap; gap: 3px; }
 
 .appTag {
-  font-size: 0.72rem; padding: 2px 7px; border-radius: 4px;
+  font-size: 0.78rem; padding: 3px 9px; border-radius: 5px;
   background: var(--input-bg); border: 1px solid var(--input-border);
   color: var(--text-secondary); white-space: nowrap;
   max-width: 130px; overflow: hidden; text-overflow: ellipsis;
@@ -1170,6 +1170,25 @@
 .formSelect:disabled { opacity: 0.5; cursor: not-allowed; }
 .formSelect option { background: var(--color-charcoal); color: var(--text-primary); }
 
+.filterSelect {
+  padding: 6px 30px 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--input-border);
+  background-color: var(--input-bg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%238B85C1' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-family: inherit;
+  cursor: pointer;
+  appearance: none;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.filterSelect:focus { border-color: var(--color-purple-mid); }
+.filterSelect option { background: var(--color-charcoal); color: var(--text-primary); }
+
 .formInput {
   padding: 0.55rem 0.8rem;
   background: var(--input-bg); border: 1px solid var(--input-border);
@@ -1404,6 +1423,23 @@
 .lblFailed  { color: var(--color-red); font-weight: 700; }
 .lblPending { color: var(--text-secondary); opacity: 0.45; }
 
+/* Hover tooltip on mini stepper dots */
+.progressTooltip {
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%; transform: translateX(-50%);
+  background: var(--color-charcoal, #111115);
+  border: 1px solid var(--input-border);
+  color: var(--text-primary);
+  font-size: 0.62rem; font-weight: 500;
+  padding: 3px 8px; border-radius: 5px;
+  white-space: nowrap;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: 20;
+}
+.progressDot:hover .progressTooltip { opacity: 1; }
+
 /* Connector line between steps */
 .progressLine {
   flex: 1;
@@ -1447,10 +1483,22 @@
   min-height: 380px;
 }
 
-/* ── Left card list ── */
-.reqCardList {
-  width: 248px;
+/* ── Card list panel (outer frame) ── */
+.cardListPanel {
+  width: 280px;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--input-border);
+  border-radius: 13px;
+  background: var(--card-bg);
+  padding: 10px;
+  overflow: hidden;
+}
+
+/* ── Scrollable inner card list ── */
+.reqCardList {
+  flex: 1;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -1488,7 +1536,7 @@
 }
 
 .reqSplitCardId {
-  font-size: 0.82rem; font-weight: 700;
+  font-size: 0.92rem; font-weight: 700;
   color: var(--text-primary);
   letter-spacing: 0.5px;
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
@@ -1704,4 +1752,245 @@
 .pageInfo {
   font-size: 0.7rem; color: var(--text-secondary);
   min-width: 44px; text-align: center;
+}
+
+/* ── Card overview extras ── */
+
+/* Three-column layout for ALL cards: 1/6 domain | 1/3 apps | 1/2 reason (or empty) */
+.cardBodySplit {
+  display: flex; gap: 0;
+  margin-top: 8px;
+}
+.cardBodySplit .cardBodyDomain {
+  flex: 0 0 16.67%;
+  border-right: 1px solid var(--input-border);
+  align-items: flex-start;
+  padding-right: 12px;
+}
+.cardBodySplit .cardBodyApps {
+  flex: 0 0 33.33%;
+  padding: 0 12px;
+  border-right: 1px solid var(--input-border);
+}
+
+/* Right half: rejection reason, or empty placeholder */
+.cardRejectSnippet {
+  flex: 0 0 50%;
+  padding-left: 12px;
+  display: flex; flex-direction: column; gap: 4px;
+  justify-content: center;
+  min-height: 28px;
+}
+.cardRejectSnippetLabel {
+  font-size: 0.6rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+.cardRejectSnippetText {
+  font-size: 0.72rem; color: #ff8080;
+  line-height: 1.5;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+/* Card body two-column: domain left | apps right */
+.cardBodyRow {
+  display: flex; align-items: flex-start;
+  margin-top: 8px; gap: 0;
+}
+.cardBodyDomain {
+  flex: 0 0 auto;
+  padding-right: 14px;
+  border-right: 1px solid var(--input-border);
+  display: flex; align-items: center;
+}
+.cardBodyApps {
+  flex: 1;
+  padding-left: 14px;
+}
+
+/* Footer row: progress (left-indented, 2/3 width) | buttons flush right */
+.cardActionRow {
+  display: flex; align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px; margin-top: 10px;
+}
+.cardProgressWrap {
+  flex: 0 1 66%;
+  min-width: 0;
+}
+.cardProgressLabel {
+  font-size: 0.6rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  display: block; margin-bottom: 5px;
+}
+.cardActionBtns {
+  display: flex; flex-direction: column;
+  gap: 5px; flex-shrink: 0;
+  border-top: 1px solid var(--input-border);
+  border-left: 1px solid var(--input-border);
+  border-radius: 9px 0 0 0;
+  padding: 8px 10px;
+  margin-right: -13px;
+  margin-bottom: -12px;
+  align-self: flex-end;
+}
+
+/* Mini stepper sizing inside card footer */
+.cardProgressWrap .progressStepper {
+  align-items: center;
+  padding: 2px 0 2px 22px;
+}
+.cardProgressWrap .progressStep {
+  min-width: 0;
+  gap: 0;
+}
+.cardProgressWrap .progressDot {
+  width: 18px; height: 18px;
+}
+.cardProgressWrap .dotPulse {
+  inset: -4px;
+}
+.cardProgressWrap .progressLine {
+  align-self: center;
+  margin-top: 0;
+  min-width: 10px;
+}
+
+.cardDomainName {
+  font-size: 0.72rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--text-primary);
+}
+
+/* Dates in top-right corner */
+.cardDatesCorner {
+  display: flex; align-items: center;
+  gap: 7px; flex-shrink: 0;
+  align-self: flex-start;
+}
+.cardDateItem {
+  display: flex; align-items: baseline; gap: 3px;
+}
+.cardDateLabel {
+  font-size: 0.64rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.03em;
+  color: var(--text-secondary);
+}
+.cardDateVal {
+  font-size: 0.76rem; font-weight: 600;
+  color: var(--text-primary);
+}
+.cardDateDot {
+  color: var(--text-secondary); opacity: 0.35;
+  font-size: 0.9rem; line-height: 1; user-select: none;
+}
+
+/* Individual action buttons on cards */
+.cardBtnCancel {
+  padding: 5px 14px; font-size: 0.78rem; font-weight: 600;
+  border-radius: 7px; cursor: pointer; white-space: nowrap;
+  min-width: 88px; text-align: center;
+  border: 1px solid rgba(222,26,26,0.35);
+  background: transparent; color: #ff5555;
+  transition: background 0.15s;
+}
+.cardBtnCancel:hover { background: rgba(222,26,26,0.09); }
+
+.cardBtnNudge {
+  padding: 5px 14px; font-size: 0.78rem; font-weight: 600;
+  border-radius: 7px; cursor: pointer; white-space: nowrap;
+  min-width: 88px; text-align: center;
+  border: 1px solid rgba(139,133,193,0.4);
+  background: rgba(139,133,193,0.1); color: var(--color-purple-mid);
+  transition: background 0.15s;
+}
+.cardBtnNudge:hover { background: rgba(139,133,193,0.22); }
+
+.cardBtnDispute {
+  padding: 5px 14px; font-size: 0.78rem; font-weight: 600;
+  border-radius: 7px; cursor: pointer; white-space: nowrap;
+  min-width: 88px; text-align: center;
+  border: 1px solid rgba(255,150,50,0.4);
+  background: rgba(255,150,50,0.08); color: #ff9632;
+  transition: background 0.15s;
+}
+.cardBtnDispute:hover { background: rgba(255,150,50,0.18); }
+
+/* ── Owner batch table ───────────────────────────── */
+.mgmtSearch {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--input-border);
+  border-radius: 7px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.mgmtSearch:focus { border-color: var(--color-purple-mid); }
+.mgmtSearch::placeholder { color: var(--text-secondary); opacity: 0.6; }
+
+.ownerBatchRow td { background: transparent; }
+.ownerBatchRow:hover td { background: var(--table-row-hover); }
+
+.ownerItemRow td {
+  background: rgba(0,0,0,0.055);
+  border-top: none;
+}
+.ownerItemRow:last-child td { border-bottom: 1px solid var(--input-border); }
+
+.ownerApproveBtn {
+  padding: 4px 10px; font-size: 0.78rem; font-family: inherit;
+  border-radius: 6px; cursor: pointer;
+  background: rgba(34,197,94,0.12); color: #22c55e;
+  border: 1px solid rgba(34,197,94,0.3);
+  transition: background 0.15s;
+}
+.ownerApproveBtn:hover { background: rgba(34,197,94,0.22); }
+
+.ownerRejectBtn {
+  padding: 4px 10px; font-size: 0.78rem; font-family: inherit;
+  border-radius: 6px; cursor: pointer;
+  background: rgba(222,26,26,0.09); color: var(--color-red);
+  border: 1px solid rgba(222,26,26,0.25);
+  transition: background 0.15s;
+}
+.ownerRejectBtn:hover { background: rgba(222,26,26,0.18); }
+
+.ownerItemApproveBtn {
+  width: 28px; height: 28px; border-radius: 6px; font-family: inherit;
+  border: 1px solid rgba(34,197,94,0.4);
+  background: rgba(34,197,94,0.1); color: #22c55e;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.ownerItemApproveBtn:hover { background: rgba(34,197,94,0.22); }
+
+.ownerItemRejectBtn {
+  width: 28px; height: 28px; border-radius: 6px; font-family: inherit;
+  border: 1px solid rgba(222,26,26,0.3);
+  background: rgba(222,26,26,0.08); color: var(--color-red);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.ownerItemRejectBtn:hover { background: rgba(222,26,26,0.18); }
+
+.ownerStatusBadge {
+  display: inline-flex; align-items: center;
+  padding: 2px 7px; border-radius: 10px;
+  font-size: 0.72rem; font-weight: 600;
+}
+.ownerStatusApproved {
+  background: rgba(34,197,94,0.12); color: #22c55e;
+  border: 1px solid rgba(34,197,94,0.3);
+}
+.ownerStatusRejected {
+  background: rgba(222,26,26,0.1); color: var(--color-red);
+  border: 1px solid rgba(222,26,26,0.25);
 }

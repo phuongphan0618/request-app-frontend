@@ -203,6 +203,23 @@
 
 .inputGroup { position: relative; }
 
+.eyeBtn {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+.eyeBtn:hover { opacity: 1; }
+
 .input {
   width: 100%;
   padding: 1rem 1rem 0.85rem;
