@@ -16,12 +16,21 @@ const INIT_APPS = [
   { id: 10, code: 'GRAFANA',   name: 'Grafana Monitoring',      domain: 'OPS',     dept: 'Vận hành',     owner: 'Lê Minh Tú',     owner_email: 'tu.lm@company.com',   active: true  },
 ];
 
+const INIT_PNLS = [
+  { id: 1, code: 'IT',   name: 'Công nghệ thông tin' },
+  { id: 2, code: 'OPS',  name: 'Vận hành & Kỹ thuật' },
+  { id: 3, code: 'BIZ',  name: 'Kinh doanh'          },
+  { id: 4, code: 'FIN',  name: 'Tài chính'            },
+  { id: 5, code: 'HR',   name: 'Nhân sự'              },
+  { id: 6, code: 'MKT',  name: 'Marketing'            },
+];
+
 const INIT_DOMAINS = [
-  { id: 1, code: 'INFRA',  name: 'Hạ tầng',      description: '', admin: '' },
-  { id: 2, code: 'DEV',    name: 'Công nghệ',     description: '', admin: '' },
-  { id: 3, code: 'OPS',    name: 'Vận hành',      description: '', admin: '' },
-  { id: 4, code: 'COMM',   name: 'Truyền thông',  description: '', admin: '' },
-  { id: 5, code: 'DESIGN', name: 'Thiết kế',      description: '', admin: '' },
+  { id: 1, code: 'INFRA',  name: 'Hạ tầng',      description: '', admin: '', pnl: 'IT'  },
+  { id: 2, code: 'DEV',    name: 'Công nghệ',     description: '', admin: '', pnl: 'IT'  },
+  { id: 3, code: 'OPS',    name: 'Vận hành',      description: '', admin: '', pnl: 'OPS' },
+  { id: 4, code: 'COMM',   name: 'Truyền thông',  description: '', admin: '', pnl: 'MKT' },
+  { id: 5, code: 'DESIGN', name: 'Thiết kế',      description: '', admin: '', pnl: 'BIZ' },
 ];
 
 const INIT_USERS = [
@@ -344,7 +353,7 @@ function DomainTable({ domains, setDomains, apps, setApps }) {
   const [search, setSearch]                     = useState('');
   const [modal, setModal]                       = useState(null); // null | 'addDomain' | 'editDomain'
   const [editDomainTarget, setEditDomainTarget] = useState(null);
-  const [domainForm, setDomainForm]             = useState({ code: '', name: '', description: '', admin: '' });
+  const [domainForm, setDomainForm]             = useState({ code: '', name: '', description: '', admin: '', pnl: '' });
   const [confirmDelete, setConfirmDelete]       = useState(null);
 
   const filtered = search
@@ -355,13 +364,13 @@ function DomainTable({ domains, setDomains, apps, setApps }) {
     : domains;
 
   function openAddDomain() {
-    setDomainForm({ code: '', name: '', description: '', admin: '' });
+    setDomainForm({ code: '', name: '', description: '', admin: '', pnl: '' });
     setModal('addDomain');
   }
 
   function openEditDomain(d) {
     setEditDomainTarget(d);
-    setDomainForm({ code: d.code, name: d.name, description: d.description || '', admin: d.admin || '' });
+    setDomainForm({ code: d.code, name: d.name, description: d.description || '', admin: d.admin || '', pnl: d.pnl || '' });
     setModal('editDomain');
   }
 
@@ -369,7 +378,7 @@ function DomainTable({ domains, setDomains, apps, setApps }) {
     e.preventDefault();
     const code = domainForm.code.trim().toUpperCase();
     if (!code || domains.find(d => d.code === code)) return;
-    setDomains(p => [...p, { id: Date.now(), code, name: domainForm.name, description: domainForm.description, admin: domainForm.admin }]);
+    setDomains(p => [...p, { id: Date.now(), code, name: domainForm.name, description: domainForm.description, admin: domainForm.admin, pnl: domainForm.pnl }]);
     setModal(null);
   }
 
@@ -378,7 +387,7 @@ function DomainTable({ domains, setDomains, apps, setApps }) {
     const newCode = domainForm.code.trim().toUpperCase();
     const oldCode = editDomainTarget.code;
     setDomains(p => p.map(d => d.id === editDomainTarget.id
-      ? { ...d, code: newCode, name: domainForm.name, description: domainForm.description, admin: domainForm.admin }
+      ? { ...d, code: newCode, name: domainForm.name, description: domainForm.description, admin: domainForm.admin, pnl: domainForm.pnl }
       : d
     ));
     if (newCode !== oldCode) {
@@ -401,7 +410,16 @@ function DomainTable({ domains, setDomains, apps, setApps }) {
             value={domainForm.name} onChange={e => setDomainForm(p => ({ ...p, name: e.target.value }))} />
         </div>
         <div className={styles.formGroup}>
-          <label className={styles.formLabel}>Mô tả ngắn</label>
+          <label className={styles.formLabel}>PNL <OptLabel /></label>
+          <select className={styles.formSelect} value={domainForm.pnl} onChange={e => setDomainForm(p => ({ ...p, pnl: e.target.value }))}>
+            <option value="">— Chưa chọn —</option>
+            {INIT_PNLS.map(p => (
+              <option key={p.id} value={p.code}>{p.code} — {p.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className={styles.formGroup}>
+          <label className={styles.formLabel}>Mô tả ngắn <OptLabel /></label>
           <textarea className={styles.formInput} placeholder="Mô tả về chức năng của Domain..."
             value={domainForm.description} onChange={e => setDomainForm(p => ({ ...p, description: e.target.value }))}
             style={{ height: 68, resize: 'none' }} />
@@ -435,16 +453,24 @@ function DomainTable({ domains, setDomains, apps, setApps }) {
         <table className={styles.mgmtTable}>
           <thead>
             <tr>
-              <th>Mã Domain</th><th>Tên</th><th>Mô tả</th><th>Admin quản lý</th>
+              <th>Mã Domain</th><th>Tên</th><th>PNL</th><th>Mô tả</th><th>Admin quản lý</th>
               <th>Số app</th><th style={{ width: 72 }}></th>
             </tr>
           </thead>
           <tbody>
-            {filtered.length > 0 ? filtered.map(d => (
+            {filtered.length > 0 ? filtered.map(d => {
+              const pnlObj = INIT_PNLS.find(p => p.code === d.pnl);
+              return (
               <tr key={d.id} className={styles.mgmtRow}>
                 <td><span className={styles.mgmtDomainTag} style={{ fontFamily: 'IBM Plex Mono, monospace' }}>{d.code}</span></td>
                 <td style={{ fontSize: '0.88rem' }}>{d.name || <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>—</span>}</td>
-                <td style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', maxWidth: 220 }}>{d.description || <span style={{ fontStyle: 'italic' }}>—</span>}</td>
+                <td>
+                  {pnlObj
+                    ? <span className={styles.mgmtBadge} style={{ background: 'rgba(99,108,220,0.12)', color: '#6b74e0' }}>{pnlObj.code}</span>
+                    : <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.8rem' }}>—</span>
+                  }
+                </td>
+                <td style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', maxWidth: 180 }}>{d.description || <span style={{ fontStyle: 'italic' }}>—</span>}</td>
                 <td style={{ fontSize: '0.83rem', color: 'var(--text-secondary)' }}>{d.admin || <span style={{ fontStyle: 'italic' }}>Chưa phân quyền</span>}</td>
                 <td>
                   <span className={styles.mgmtBadge} style={{ background: 'rgba(139,133,193,0.13)', color: '#a09ab9' }}>
@@ -458,8 +484,8 @@ function DomainTable({ domains, setDomains, apps, setApps }) {
                   </div>
                 </td>
               </tr>
-            )) : (
-              <tr><td colSpan={6} className={styles.mgmtEmpty}>Không tìm thấy domain nào.</td></tr>
+            )}) : (
+              <tr><td colSpan={7} className={styles.mgmtEmpty}>Không tìm thấy domain nào.</td></tr>
             )}
           </tbody>
         </table>
