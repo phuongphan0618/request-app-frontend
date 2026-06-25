@@ -5,7 +5,7 @@ import styles from './App.module.css';
 import { MOCK_USER, genId } from './data';
 import { fmtDate, fmtDateTime, StatusBadge, useToasts, ToastStack } from './helpers';
 import { ClockIcon } from './TabAdmin';
-import { getDepartments, getDomains, getApplications, createRequest } from '../../lib/api';
+import { getDepartments, getDomains, getApplications, createRequest, getMyRequest, cancelRequest, disputeRequest, remindRequest } from '../../lib/api';
 
 // ── Progress logic ────────────────────────────────────────────
 
@@ -25,6 +25,7 @@ function stepState(idx, activeStep, failed) {
 function getItemProgress(reqStatus, itemStatus) {
   if (reqStatus === 'pending_admin')     return { activeStep: 1, failed: false };
   if (reqStatus === 'rejected_by_admin') return { activeStep: 1, failed: true };
+  if (reqStatus === 'cancelled')         return { activeStep: 1, failed: true };
   if (reqStatus === 'completed')         return { activeStep: 4, failed: false };
   if (itemStatus === 'approved')         return { activeStep: 4, failed: false };
   if (itemStatus === 'rejected_by_owner') return { activeStep: 2, failed: true };
@@ -74,7 +75,9 @@ function ProgressStepperCore({ activeStep, failed, failLabel, showLabels = true 
 
 function ItemProgressStepper({ reqStatus, itemStatus }) {
   const { activeStep, failed } = getItemProgress(reqStatus, itemStatus ?? 'pending_owner');
-  const failLabel = reqStatus === 'rejected_by_admin' ? 'Bị từ chối' : 'Owner từ chối';
+  const failLabel = reqStatus === 'cancelled'
+    ? 'Đã hủy'
+    : reqStatus === 'rejected_by_admin' ? 'Bị từ chối' : 'Owner từ chối';
   return <ProgressStepperCore activeStep={activeStep} failed={failed} failLabel={failLabel} />;
 }
 
@@ -84,6 +87,7 @@ function statusToStep(status) {
   if (status === 'pending_owner')     return { activeStep: 2, failed: false };
   if (status === 'completed')         return { activeStep: 4, failed: false };
   if (status === 'rejected_by_admin') return { activeStep: 1, failed: true  };
+  if (status === 'cancelled')         return { activeStep: 1, failed: true  };
   return { activeStep: 1, failed: false };
 }
 
@@ -190,7 +194,6 @@ function ReqCard({ req, isSelected, onClick, compact, onCancel, onNudge, onDispu
   const isPending   = req.status === 'pending_admin';
   const isApproved  = req.status === 'pending_owner';
   const isRejected  = req.status === 'rejected_by_admin';
-  const isCompleted = req.status === 'completed';
   const { activeStep, failed } = statusToStep(req.status);
 
   const domainBlock = (
@@ -243,7 +246,7 @@ function ReqCard({ req, isSelected, onClick, compact, onCancel, onNudge, onDispu
             {isRejected && (
               <>
                 <span className={styles.cardRejectSnippetLabel}>Lý do từ chối:</span>
-                <span className={styles.cardRejectSnippetText}>{req.reject_note || '—'}</span>
+                <span className={styles.cardRejectSnippetText}>{req.review_note || req.reject_note || '—'}</span>
               </>
             )}
           </div>
@@ -262,7 +265,7 @@ function ReqCard({ req, isSelected, onClick, compact, onCancel, onNudge, onDispu
       {!compact && (
         <div className={styles.cardActionRow} onClick={e => e.stopPropagation()}>
           <div className={styles.cardProgressWrap}>
-            <ProgressStepperCore activeStep={activeStep} failed={failed} failLabel="Bị từ chối" showLabels={false} />
+            <ProgressStepperCore activeStep={activeStep} failed={failed} failLabel={req.status === 'cancelled' ? 'Đã hủy' : 'Bị từ chối'} showLabels={false} />
           </div>
           <div className={styles.cardActionBtns}>
             {isPending && (
@@ -277,9 +280,6 @@ function ReqCard({ req, isSelected, onClick, compact, onCancel, onNudge, onDispu
             {isRejected && (
               <button className={styles.cardBtnDispute} onClick={() => onDispute(req)}>Khiếu nại</button>
             )}
-            {isCompleted && (
-              <button className={styles.cardBtnCancel} onClick={() => onCancel(req)}>Hủy</button>
-            )}
           </div>
         </div>
       )}
@@ -289,8 +289,9 @@ function ReqCard({ req, isSelected, onClick, compact, onCancel, onNudge, onDispu
 
 // ── Right detail pane ─────────────────────────────────────────
 
-function ReqDetail({ req }) {
+function ReqDetail({ req, onCancel }) {
   const canCancel = ['pending_admin', 'pending_owner'].includes(req.status);
+  const rejectNote = req.review_note || req.reject_note;
 
   return (
     <div className={styles.reqDetailPane}>
@@ -301,7 +302,7 @@ function ReqDetail({ req }) {
           <StatusBadge status={req.status} />
         </div>
         {canCancel && (
-          <button className={styles.rdCancelBtn}>Hủy yêu cầu</button>
+          <button className={styles.rdCancelBtn} onClick={() => onCancel(req)}>Hủy yêu cầu</button>
         )}
       </div>
 
@@ -337,10 +338,10 @@ function ReqDetail({ req }) {
           )}
         </div>
 
-        {req.reject_note && (
+        {rejectNote && (
           <div className={styles.rdSection}>
             <div className={styles.rdSectionTitle}>Ghi chú từ chối</div>
-            <p className={styles.rdRejectNote}>{req.reject_note}</p>
+            <p className={styles.rdRejectNote}>{rejectNote}</p>
           </div>
         )}
 
@@ -567,15 +568,13 @@ function CreateRequestModal({ onClose, onCreate }) {
 
 const PAGE_SIZE = 3;
 
-export function TabRequester({ myRequests, onCreate }) {
+export function TabRequester({ myRequests, onCreate, onRefresh, onCancelSuccess }) {
   const { toasts, push }          = useToasts();
   const [sub, setSub]             = useState('active');
   const [showModal, setShowModal] = useState(false);
   const [selected, setSelected]   = useState(null);
+  const [selectedDetail, setSelectedDetail] = useState(null);
   const [page, setPage]           = useState(1);
-
-  // Track locally-cancelled request IDs
-  const [cancelledIds, setCancelledIds] = useState(new Set());
 
   // Action modals
   const [cancelTarget, setCancelTarget]   = useState(null); // { req, reasonRequired }
@@ -583,28 +582,62 @@ export function TabRequester({ myRequests, onCreate }) {
 
   const compact = !!selected; // cards are compact when detail pane is open
 
-  const displayReqs = myRequests.filter(r => !cancelledIds.has(r.id));
-  const active = displayReqs.filter(r => r.status === 'pending_admin' || r.status === 'pending_owner');
-  const done   = displayReqs.filter(r => r.status === 'completed'    || r.status === 'rejected_by_admin');
+  const active = myRequests.filter(r => r.status === 'pending_admin' || r.status === 'pending_owner');
+  const done   = myRequests.filter(r => r.status === 'completed' || r.status === 'rejected_by_admin' || r.status === 'cancelled');
   const rows   = sub === 'active' ? active : done;
   const paged  = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  useEffect(() => {
+    if (!selected) { setSelectedDetail(null); return; }
+    let cancelled = false;
+    async function loadDetail() {
+      try {
+        const data = await getMyRequest(selected.id);
+        if (!cancelled) setSelectedDetail(data);
+      } catch (err) {
+        console.error('Lỗi tải chi tiết request:', err);
+      }
+    }
+    loadDetail();
+    return () => { cancelled = true; };
+  }, [selected]);
+
   function handleTabChange(key) { setSub(key); setSelected(null); setPage(1); }
 
-  function handleNudge(req) {
-    push(`Đã gửi nhắc nhở đến admin cho yêu cầu ${req.id}`, 'success', '🔔');
+  async function handleNudge(req) {
+    try {
+      await remindRequest(req.id);
+      push(`Đã gửi nhắc nhở đến admin cho yêu cầu ${req.id}`, 'success', '🔔');
+    } catch (err) {
+      push(err.message || 'Không thể gửi nhắc nhở', 'error', '✕');
+    }
   }
 
-  function handleCancelConfirm(_reason) {
-    setCancelledIds(p => new Set([...p, cancelTarget.req.id]));
-    if (selected?.id === cancelTarget.req.id) setSelected(null);
-    push(`Đã hủy yêu cầu ${cancelTarget.req.id}`, 'info', '↩');
-    setCancelTarget(null);
+  async function handleCancelConfirm(reason) {
+    const target = cancelTarget.req;
+    try {
+      const updated = await cancelRequest(target.id, reason);
+      if (selected?.id === target.id) setSelected(null);
+      push(`Đã hủy yêu cầu ${target.id}`, 'info', '↩');
+      // Gọi callback cha để cập nhật state với dữ liệu mới nhất từ backend
+      onCancelSuccess?.(target.id, updated);
+    } catch (err) {
+      push(err.message || 'Không thể hủy yêu cầu', 'error', '✕');
+    } finally {
+      setCancelTarget(null);
+    }
   }
 
-  function handleDisputeConfirm(_reason) {
-    push(`Đã gửi khiếu nại cho yêu cầu ${disputeTarget.id}`, 'success', '📨');
-    setDisputeTarget(null);
+  async function handleDisputeConfirm(reason) {
+    try {
+      await disputeRequest(disputeTarget.id, reason);
+      push(`Đã gửi khiếu nại cho yêu cầu ${disputeTarget.id}`, 'success', '📨');
+      await onRefresh?.();
+    } catch (err) {
+      push(err.message || 'Không thể gửi khiếu nại', 'error', '✕');
+    } finally {
+      setDisputeTarget(null);
+    }
   }
 
   return (
@@ -693,7 +726,13 @@ export function TabRequester({ myRequests, onCreate }) {
         </div>
 
         {/* Right: detail pane — only when a card is selected */}
-        {selected && <ReqDetail key={selected.id} req={selected} />}
+        {selected && (
+          <ReqDetail
+            key={selected.id}
+            req={selectedDetail || selected}
+            onCancel={r => setCancelTarget({ req: r, reasonRequired: r.status === 'pending_owner' })}
+          />
+        )}
       </div>
     </div>
   );

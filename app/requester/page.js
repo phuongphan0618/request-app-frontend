@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '../../lib/useTheme';
 import { getCurrentUser } from '../../lib/api';
@@ -20,6 +20,36 @@ export default function RequesterPage() {
   const [loading, setLoading] = useState(true);
   const { toasts, push: pushToast } = useToasts();
 
+  const inFlightRef = useRef(false);
+  // Giữ tạm trạng thái vừa cập nhật optimistic (vd. vừa hủy) để polling không ghi đè ngược
+  // lại trạng thái cũ nếu backend xử lý có độ trễ. Tự xoá khi backend đã đồng bộ hoặc hết hạn.
+  const overridesRef = useRef(new Map());
+
+  async function fetchRequests(isInitial = true) {
+    if (inFlightRef.current) return; // bỏ qua nếu lần fetch trước chưa xong
+    inFlightRef.current = true;
+    try {
+      if (isInitial) setLoading(true);
+      const requests = await getMyRequests();
+      const merged = (requests || []).map(r => {
+        const ov = overridesRef.current.get(r.id);
+        if (!ov) return r;
+        if (Date.now() > ov.expiresAt || r.status === ov.status) {
+          overridesRef.current.delete(r.id);
+          return r;
+        }
+        return { ...r, status: ov.status, review_note: ov.review_note ?? r.review_note };
+      });
+      setMyRequests(merged);
+    } catch (err) {
+      console.error('Lỗi tải requests:', err);
+      if (isInitial) pushToast('Không thể tải danh sách requests', 'error', '✕');
+    } finally {
+      if (isInitial) setLoading(false);
+      inFlightRef.current = false;
+    }
+  }
+
   useEffect(() => {
     const currentUser = getCurrentUser();
     if (currentUser && currentUser.email) {
@@ -29,26 +59,30 @@ export default function RequesterPage() {
       return;
     }
 
-    // Fetch user's requests from API
-    async function fetchRequests() {
-      try {
-        setLoading(true);
-        const requests = await getMyRequests();
-        setMyRequests(requests || []);
-      } catch (err) {
-        console.error('Lỗi tải requests:', err);
-        pushToast('Không thể tải danh sách requests', 'error', '✕');
-      } finally {
-        setLoading(false);
-      }
-    }
+    fetchRequests(true);
+  }, [router]);
 
-    fetchRequests();
-  }, [router, pushToast]);
+  // Tự động cập nhật danh sách requests, không cần người dùng chủ động refresh
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => fetchRequests(false), 800);
+    return () => clearInterval(interval);
+  }, [user]);
 
   function handleCreateRequest(newReq) {
     setMyRequests(p => [newReq, ...p]);
     pushToast(`Đã gửi ${newReq.id} — chờ admin xem xét`, 'success', '✓');
+  }
+
+  function handleCancelRequest(reqId, updated) {
+    const review_note = updated?.review_note;
+    // Giữ override 15s để các vòng polling tiếp theo không ghi đè ngược trạng thái này
+    overridesRef.current.set(reqId, { status: 'cancelled', review_note, expiresAt: Date.now() + 15000 });
+    // Chỉ cập nhật status/review_note, giữ nguyên các field còn lại của item trong list
+    // (response của API cancel có shape khác với response của list API, không merge toàn bộ)
+    setMyRequests(p =>
+      p.map(r => r.id === reqId ? { ...r, status: 'cancelled', review_note: review_note ?? r.review_note } : r)
+    );
   }
 
   return (
@@ -115,7 +149,7 @@ export default function RequesterPage() {
               Đang tải dữ liệu...
             </div>
           ) : (
-            <TabRequester myRequests={myRequests} onCreate={handleCreateRequest} />
+            <TabRequester myRequests={myRequests} onCreate={handleCreateRequest} onRefresh={fetchRequests} onCancelSuccess={handleCancelRequest} />
           )}
         </div>
       </main>

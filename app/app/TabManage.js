@@ -1,48 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from './App.module.css';
-
-const INIT_APPS = [
-  { id: 1,  code: 'VPN',       name: 'VPN Nội bộ',             domain: 'INFRA',   dept: 'Hạ tầng',      owner: 'Nguyễn Văn An',  owner_email: 'an.nv@company.com',   active: true  },
-  { id: 2,  code: 'JIRA',      name: 'Jira Quản lý dự án',     domain: 'DEV',     dept: 'Công nghệ',    owner: 'Trần Thị Bích',  owner_email: 'bich.tt@company.com', active: true  },
-  { id: 3,  code: 'GITLAB',    name: 'GitLab Source Control',   domain: 'DEV',     dept: 'Công nghệ',    owner: null,             owner_email: null,                  active: false },
-  { id: 4,  code: 'CONFLUENCE',name: 'Confluence Tài liệu',    domain: 'OPS',     dept: 'Vận hành',     owner: 'Lê Minh Tú',     owner_email: 'tu.lm@company.com',   active: true  },
-  { id: 5,  code: 'SLACK',     name: 'Slack Workspace',         domain: 'COMM',    dept: 'Truyền thông', owner: 'Phạm Hoàng Nam', owner_email: 'nam.ph@company.com',  active: true  },
-  { id: 6,  code: 'FIGMA',     name: 'Figma Thiết kế',          domain: 'DESIGN',  dept: 'Thiết kế',     owner: null,             owner_email: null,                  active: true  },
-  { id: 7,  code: 'AWS',       name: 'AWS Console',             domain: 'INFRA',   dept: 'Hạ tầng',      owner: 'Nguyễn Văn An',  owner_email: 'an.nv@company.com',   active: true  },
-  { id: 8,  code: 'K8S',       name: 'Kubernetes Dashboard',    domain: 'INFRA',   dept: 'Hạ tầng',      owner: null,             owner_email: null,                  active: false },
-  { id: 9,  code: 'SENTRY',    name: 'Sentry Error Tracking',   domain: 'DEV',     dept: 'Công nghệ',    owner: 'Trần Thị Bích',  owner_email: 'bich.tt@company.com', active: true  },
-  { id: 10, code: 'GRAFANA',   name: 'Grafana Monitoring',      domain: 'OPS',     dept: 'Vận hành',     owner: 'Lê Minh Tú',     owner_email: 'tu.lm@company.com',   active: true  },
-];
-
-const INIT_PNLS = [
-  { id: 1, code: 'IT',   name: 'Công nghệ thông tin' },
-  { id: 2, code: 'OPS',  name: 'Vận hành & Kỹ thuật' },
-  { id: 3, code: 'BIZ',  name: 'Kinh doanh'          },
-  { id: 4, code: 'FIN',  name: 'Tài chính'            },
-  { id: 5, code: 'HR',   name: 'Nhân sự'              },
-  { id: 6, code: 'MKT',  name: 'Marketing'            },
-];
-
-const INIT_DOMAINS = [
-  { id: 1, code: 'INFRA',  name: 'Hạ tầng',      description: '', admin: '', pnl: 'IT'  },
-  { id: 2, code: 'DEV',    name: 'Công nghệ',     description: '', admin: '', pnl: 'IT'  },
-  { id: 3, code: 'OPS',    name: 'Vận hành',      description: '', admin: '', pnl: 'OPS' },
-  { id: 4, code: 'COMM',   name: 'Truyền thông',  description: '', admin: '', pnl: 'MKT' },
-  { id: 5, code: 'DESIGN', name: 'Thiết kế',      description: '', admin: '', pnl: 'BIZ' },
-];
-
-const INIT_USERS = [
-  { id: 1, last_name: 'Nguyễn', first_name: 'Văn An',    email: 'an.nv@company.com',    roles: []            },
-  { id: 2, last_name: 'Trần',   first_name: 'Thị Bích',  email: 'bich.tt@company.com',  roles: ['owner']     },
-  { id: 3, last_name: 'Lê',     first_name: 'Minh Tú',   email: 'tu.lm@company.com',    roles: ['owner']     },
-  { id: 4, last_name: 'Phạm',   first_name: 'Hoàng Nam', email: 'nam.ph@company.com',   roles: []            },
-  { id: 5, last_name: 'Hoàng',  first_name: 'Thu Hà',    email: 'ha.ht@company.com',    roles: ['sub-admin'] },
-  { id: 6, last_name: 'Đỗ',     first_name: 'Quốc Bảo',  email: 'bao.dq@company.com',   roles: []            },
-  { id: 7, last_name: 'Vũ',     first_name: 'Thành Long', email: 'long.vt@company.com',  roles: []            },
-  { id: 8, last_name: 'Bùi',    first_name: 'Lan Anh',   email: 'anh.bl@company.com',   roles: ['owner']     },
-];
+import {
+  getDomains, getDepartments, createDomain, updateDomain, deleteDomain, getSubadmins,
+  getUsers, createUser, updateUser, deleteUser,
+  getApplications, createApplication, updateApplication, deleteApplication, getOwners,
+} from '../../lib/api';
+import { useToasts } from './helpers';
 
 const PAGE_SIZE = 8;
 
@@ -121,21 +86,112 @@ function ConfirmModal({ label, onCancel, onConfirm }) {
 
 // ── App management ───────────────────────────────────────────────
 
-function AppTable({ apps, setApps, domains }) {
+const EMPTY_APP_FORM = { name: '', code: '', domain: '', ownerId: '', is_active: true };
+
+function AppFormFields({ appForm, setAppForm, domains, owners, isSubmitting, showActive }) {
+  return (
+    <>
+      <div className={styles.formGroup}>
+        <label className={styles.formLabel}>Tên ứng dụng <span className={styles.required}>*</span></label>
+        <input className={styles.formInput} type="text" placeholder="VD: Hệ thống VPN nội bộ" required autoFocus
+          value={appForm.name} onChange={e => setAppForm(p => ({ ...p, name: e.target.value }))} disabled={isSubmitting} />
+      </div>
+      <div className={styles.formGroup}>
+        <label className={styles.formLabel}>Mã app <span className={styles.required}>*</span></label>
+        <input className={styles.formInput} type="text" placeholder="VD: VPN" required
+          value={appForm.code} onChange={e => setAppForm(p => ({ ...p, code: e.target.value.toUpperCase() }))} disabled={isSubmitting} />
+      </div>
+      <div className={styles.formGroup}>
+        <label className={styles.formLabel}>Domain</label>
+        <select className={styles.formSelect} value={appForm.domain} onChange={e => setAppForm(p => ({ ...p, domain: e.target.value }))} disabled={isSubmitting} required>
+          <option value="">— Chọn domain —</option>
+          {domains.map(d => <option key={d.id} value={String(d.id)}>{d.code}{d.name ? ` — ${d.name}` : ''}</option>)}
+        </select>
+      </div>
+      <div className={styles.formGroup}>
+        <label className={styles.formLabel}>Owner quản lý <OptLabel /></label>
+        <select className={styles.formSelect} value={appForm.ownerId} onChange={e => setAppForm(p => ({ ...p, ownerId: e.target.value }))} disabled={isSubmitting}>
+          <option value="">— Chưa phân quyền —</option>
+          {owners.map(u => (
+            <option key={u.id} value={String(u.id)}>{u.last_name} {u.first_name} ({u.email})</option>
+          ))}
+        </select>
+      </div>
+      {showActive && (
+        <div className={styles.formGroup} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <input type="checkbox" id="chkActive" checked={appForm.is_active}
+            onChange={e => setAppForm(p => ({ ...p, is_active: e.target.checked }))}
+            style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--color-red)' }} disabled={isSubmitting} />
+          <label htmlFor="chkActive" className={styles.formLabel} style={{ cursor: 'pointer', textTransform: 'none', letterSpacing: 0 }}>
+            Đang hoạt động
+          </label>
+        </div>
+      )}
+    </>
+  );
+}
+
+function AppTable() {
+  const { push: pushToast } = useToasts();
+  const [apps, setApps]               = useState([]);
+  const [domains, setDomains]         = useState([]);
+  const [owners, setOwners]           = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [search, setSearch]           = useState('');
   const [filterDomain, setFilterDomain] = useState('');
   const [page, setPage]               = useState(1);
   const [modal, setModal]             = useState(null); // null | 'addApp' | 'editApp'
   const [editAppTarget, setEditAppTarget] = useState(null);
-  const [appForm, setAppForm]         = useState({ name: '', code: '', domain: '', ownerId: '', active: true });
+  const [appForm, setAppForm]         = useState(EMPTY_APP_FORM);
   const [confirmDelete, setConfirmDelete] = useState(null); // null | { id, label }
 
-  let filtered = filterDomain ? apps.filter(a => a.domain === filterDomain) : apps;
+  async function loadApps() {
+    try {
+      setLoading(true);
+      const data = await getApplications();
+      setApps(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Lỗi tải app:', err);
+      pushToast(err.message || 'Không thể tải danh sách app', 'error', '✕');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadApps();
+    async function fetchDomains() {
+      try {
+        const data = await getDomains();
+        setDomains(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error('Lỗi tải domain:', err);
+      }
+    }
+    fetchDomains();
+  }, []);
+
+  useEffect(() => {
+    if (modal === 'addApp' || modal === 'editApp') {
+      async function fetchOwners() {
+        try {
+          const data = await getOwners();
+          setOwners(Array.isArray(data) ? data : []);
+        } catch (err) {
+          console.error('Lỗi tải owner:', err);
+        }
+      }
+      fetchOwners();
+    }
+  }, [modal]);
+
+  let filtered = filterDomain ? apps.filter(a => String(a.domain) === filterDomain) : apps;
   filtered = search
     ? filtered.filter(a =>
         a.name.toLowerCase().includes(search.toLowerCase()) ||
         a.code.toLowerCase().includes(search.toLowerCase()) ||
-        a.domain.toLowerCase().includes(search.toLowerCase())
+        (a.domain_code || '').toLowerCase().includes(search.toLowerCase())
       )
     : filtered;
 
@@ -143,82 +199,82 @@ function AppTable({ apps, setApps, domains }) {
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   function openAddApp() {
-    setAppForm({ name: '', code: '', domain: domains[0]?.code ?? '', ownerId: '', active: true });
+    setAppForm({ name: '', code: '', domain: '', ownerId: '', is_active: true });
     setModal('addApp');
   }
 
   function openEditApp(app) {
     setEditAppTarget(app);
-    const matched = INIT_USERS.find(u => u.email === app.owner_email);
-    setAppForm({ name: app.name, code: app.code, domain: app.domain, ownerId: matched ? String(matched.id) : '', active: app.active });
+    setAppForm({
+      name: app.name,
+      code: app.code,
+      domain: app.domain ? String(app.domain) : '',
+      ownerId: app.owner ? String(app.owner) : '',
+      is_active: app.is_active,
+    });
     setModal('editApp');
   }
 
-  function resolveOwner(ownerId) {
-    const u = INIT_USERS.find(u => String(u.id) === ownerId);
-    return u ? { owner: `${u.last_name} ${u.first_name}`, owner_email: u.email } : { owner: null, owner_email: null };
+  function buildPayload() {
+    const domainObj = domains.find(d => String(d.id) === appForm.domain);
+    const ownerObj = appForm.ownerId ? owners.find(u => String(u.id) === appForm.ownerId) : null;
+    return {
+      name: appForm.name,
+      code: appForm.code.toUpperCase(),
+      description: '',
+      domain: domainObj ? domainObj.id : null,
+      owner: ownerObj ? ownerObj.id : null,
+      is_active: appForm.is_active,
+    };
   }
 
-  function handleAddApp(e) {
+  async function handleAddApp(e) {
     e.preventDefault();
-    const { owner, owner_email } = resolveOwner(appForm.ownerId);
-    setApps(p => [{
-      id: Date.now(), code: appForm.code.toUpperCase(), name: appForm.name,
-      domain: appForm.domain, dept: '—', owner, owner_email, active: appForm.active,
-    }, ...p]);
-    setModal(null); setPage(1);
+    if (isSubmitting) return;
+
+    try {
+      setIsSubmitting(true);
+      await createApplication(buildPayload());
+      pushToast(`Đã tạo app ${appForm.code.toUpperCase()} thành công`, 'success', '✓');
+      await loadApps();
+      setModal(null); setPage(1);
+    } catch (err) {
+      console.error('Lỗi tạo app:', err);
+      pushToast(err.message || 'Không thể tạo app', 'error', '✕');
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
-  function handleEditApp(e) {
+  async function handleEditApp(e) {
     e.preventDefault();
-    const { owner, owner_email } = resolveOwner(appForm.ownerId);
-    setApps(p => p.map(a => a.id === editAppTarget.id
-      ? { ...a, name: appForm.name, code: appForm.code.toUpperCase(), domain: appForm.domain, owner, owner_email, active: appForm.active }
-      : a
-    ));
-    setModal(null);
+    if (isSubmitting) return;
+
+    try {
+      setIsSubmitting(true);
+      await updateApplication(editAppTarget.id, buildPayload());
+      pushToast(`Đã cập nhật app ${appForm.code.toUpperCase()} thành công`, 'success', '✓');
+      await loadApps();
+      setModal(null);
+    } catch (err) {
+      console.error('Lỗi sửa app:', err);
+      pushToast(err.message || 'Không thể cập nhật app', 'error', '✕');
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
-  function AppFormFields({ showActive }) {
-    return (
-      <>
-        <div className={styles.formGroup}>
-          <label className={styles.formLabel}>Tên ứng dụng <span className={styles.required}>*</span></label>
-          <input className={styles.formInput} type="text" placeholder="VD: Hệ thống VPN nội bộ" required autoFocus
-            value={appForm.name} onChange={e => setAppForm(p => ({ ...p, name: e.target.value }))} />
-        </div>
-        <div className={styles.formGroup}>
-          <label className={styles.formLabel}>Mã app <span className={styles.required}>*</span></label>
-          <input className={styles.formInput} type="text" placeholder="VD: VPN" required
-            value={appForm.code} onChange={e => setAppForm(p => ({ ...p, code: e.target.value.toUpperCase() }))} />
-        </div>
-        <div className={styles.formGroup}>
-          <label className={styles.formLabel}>Domain</label>
-          <select className={styles.formSelect} value={appForm.domain} onChange={e => setAppForm(p => ({ ...p, domain: e.target.value }))}>
-            {domains.map(d => <option key={d.id} value={d.code}>{d.code}{d.name ? ` — ${d.name}` : ''}</option>)}
-          </select>
-        </div>
-        <div className={styles.formGroup}>
-          <label className={styles.formLabel}>Owner quản lý <OptLabel /></label>
-          <select className={styles.formSelect} value={appForm.ownerId} onChange={e => setAppForm(p => ({ ...p, ownerId: e.target.value }))}>
-            <option value="">— Chưa phân quyền —</option>
-            {INIT_USERS.map(u => (
-              <option key={u.id} value={String(u.id)}>{u.last_name} {u.first_name} ({u.email})</option>
-            ))}
-          </select>
-        </div>
-        {showActive && (
-          <div className={styles.formGroup} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <input type="checkbox" id="chkActive" checked={appForm.active}
-              onChange={e => setAppForm(p => ({ ...p, active: e.target.checked }))}
-              style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--color-red)' }} />
-            <label htmlFor="chkActive" className={styles.formLabel} style={{ cursor: 'pointer', textTransform: 'none', letterSpacing: 0 }}>
-              Đang hoạt động
-            </label>
-          </div>
-        )}
-      </>
-    );
+  async function handleDeleteApp(id) {
+    try {
+      await deleteApplication(id);
+      pushToast('Đã xóa app thành công', 'success', '✓');
+      setApps(p => p.filter(a => a.id !== id));
+    } catch (err) {
+      console.error('Lỗi xóa app:', err);
+      pushToast(err.message || 'Không thể xóa app', 'error', '✕');
+    } finally {
+      setConfirmDelete(null);
+    }
   }
 
   return (
@@ -238,7 +294,7 @@ function AppTable({ apps, setApps, domains }) {
             onChange={e => { setFilterDomain(e.target.value); setPage(1); }}
           >
             <option value="">Tất cả domain</option>
-            {domains.map(d => <option key={d.id} value={d.code}>{d.code}{d.name ? ` — ${d.name}` : ''}</option>)}
+            {domains.map(d => <option key={d.id} value={String(d.id)}>{d.code}{d.name ? ` — ${d.name}` : ''}</option>)}
           </select>
         </div>
         <button className={styles.mgmtAddBtn} onClick={openAddApp}>+ Thêm app</button>
@@ -253,23 +309,25 @@ function AppTable({ apps, setApps, domains }) {
             </tr>
           </thead>
           <tbody>
-            {paged.length > 0 ? paged.map(app => (
+            {loading ? (
+              <tr><td colSpan={7} className={styles.mgmtEmpty}>Đang tải...</td></tr>
+            ) : paged.length > 0 ? paged.map(app => (
               <tr key={app.id} className={styles.mgmtRow}>
                 <td><strong style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: '0.8rem' }}>{app.code}</strong></td>
                 <td>{app.name}</td>
-                <td><span className={styles.mgmtDomainTag}>{app.domain}</span></td>
-                <td style={{ color: 'var(--text-secondary)', fontSize: '0.84rem' }}>{app.dept}</td>
+                <td><span className={styles.mgmtDomainTag}>{app.domain_code}</span></td>
+                <td style={{ color: 'var(--text-secondary)', fontSize: '0.84rem' }}>{app.department_name || '—'}</td>
                 <td>
-                  {app.owner
-                    ? <div><div style={{ fontSize: '0.84rem' }}>{app.owner}</div><div style={{ fontSize: '0.73rem', color: 'var(--text-secondary)' }}>{app.owner_email}</div></div>
+                  {app.owner_detail
+                    ? <div><div style={{ fontSize: '0.84rem' }}>{app.owner_detail.last_name} {app.owner_detail.first_name}</div><div style={{ fontSize: '0.73rem', color: 'var(--text-secondary)' }}>{app.owner_detail.email}</div></div>
                     : <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.8rem' }}>Chưa phân quyền</span>
                   }
                 </td>
                 <td>
-                  <span className={styles.mgmtBadge} style={app.active
+                  <span className={styles.mgmtBadge} style={app.is_active
                     ? { background: 'rgba(46,204,113,0.12)', color: '#2ecc71' }
                     : { background: 'rgba(160,154,185,0.1)', color: 'var(--text-secondary)' }
-                  }>{app.active ? '● Hoạt động' : '○ Tạm dừng'}</span>
+                  }>{app.is_active ? '● Hoạt động' : '○ Tạm dừng'}</span>
                 </td>
                 <td>
                   <div style={{ display: 'flex', gap: 4 }}>
@@ -305,13 +363,13 @@ function AppTable({ apps, setApps, domains }) {
           <div className={styles.modalBox} onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
             <div className={styles.modalHeader}>
               <h3 className={styles.modalTitle}>Thêm ứng dụng</h3>
-              <button className={styles.modalClose} onClick={() => setModal(null)}>✕</button>
+              <button className={styles.modalClose} onClick={() => setModal(null)} disabled={isSubmitting}>✕</button>
             </div>
             <form className={styles.modalForm} onSubmit={handleAddApp}>
-              <AppFormFields showActive={false} />
+              <AppFormFields appForm={appForm} setAppForm={setAppForm} domains={domains} owners={owners} isSubmitting={isSubmitting} showActive={false} />
               <div className={styles.modalActions}>
-                <button type="button" className={styles.btnSecondary} onClick={() => setModal(null)}>Hủy</button>
-                <button type="submit" className={styles.btnPrimary}>Thêm</button>
+                <button type="button" className={styles.btnSecondary} onClick={() => setModal(null)} disabled={isSubmitting}>Hủy</button>
+                <button type="submit" className={styles.btnPrimary} disabled={isSubmitting}>{isSubmitting ? 'Đang tạo...' : 'Thêm'}</button>
               </div>
             </form>
           </div>
@@ -323,13 +381,13 @@ function AppTable({ apps, setApps, domains }) {
           <div className={styles.modalBox} onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
             <div className={styles.modalHeader}>
               <h3 className={styles.modalTitle}>Sửa: {editAppTarget.code}</h3>
-              <button className={styles.modalClose} onClick={() => setModal(null)}>✕</button>
+              <button className={styles.modalClose} onClick={() => setModal(null)} disabled={isSubmitting}>✕</button>
             </div>
             <form className={styles.modalForm} onSubmit={handleEditApp}>
-              <AppFormFields showActive={true} />
+              <AppFormFields appForm={appForm} setAppForm={setAppForm} domains={domains} owners={owners} isSubmitting={isSubmitting} showActive={true} />
               <div className={styles.modalActions}>
-                <button type="button" className={styles.btnSecondary} onClick={() => setModal(null)}>Hủy</button>
-                <button type="submit" className={styles.btnPrimary}>Lưu thay đổi</button>
+                <button type="button" className={styles.btnSecondary} onClick={() => setModal(null)} disabled={isSubmitting}>Hủy</button>
+                <button type="submit" className={styles.btnPrimary} disabled={isSubmitting}>{isSubmitting ? 'Đang lưu...' : 'Lưu thay đổi'}</button>
               </div>
             </form>
           </div>
@@ -340,7 +398,7 @@ function AppTable({ apps, setApps, domains }) {
         <ConfirmModal
           label={confirmDelete.label}
           onCancel={() => setConfirmDelete(null)}
-          onConfirm={() => { setApps(p => p.filter(a => a.id !== confirmDelete.id)); setConfirmDelete(null); }}
+          onConfirm={() => handleDeleteApp(confirmDelete.id)}
         />
       )}
     </div>
@@ -349,12 +407,92 @@ function AppTable({ apps, setApps, domains }) {
 
 // ── Domain management ────────────────────────────────────────────
 
-function DomainTable({ domains, setDomains, apps, setApps }) {
+function DomainFormFields({ domainForm, setDomainForm, departments, subadmins, isSubmitting }) {
+  return (
+    <>
+      <div className={styles.formGroup}>
+        <label className={styles.formLabel}>PNL <span className={styles.required}>*</span></label>
+        <select className={styles.formSelect} value={domainForm.department} onChange={e => setDomainForm(p => ({ ...p, department: e.target.value }))} required disabled={isSubmitting} autoFocus>
+          <option value="">-- Chọn PNL --</option>
+          {departments.map(p => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+      </div>
+      <div className={styles.formGroup}>
+        <label className={styles.formLabel}>Tên Domain</label>
+        <input className={styles.formInput} type="text" placeholder="VD: Hạ tầng mạng"
+          value={domainForm.name} onChange={e => setDomainForm(p => ({ ...p, name: e.target.value }))} disabled={isSubmitting} />
+      </div>
+      <div className={styles.formGroup}>
+        <label className={styles.formLabel}>Mã Domain <span className={styles.required}>*</span></label>
+        <input className={styles.formInput} type="text" placeholder="VD: INFRA" required
+          value={domainForm.code} onChange={e => setDomainForm(p => ({ ...p, code: e.target.value.toUpperCase() }))} disabled={isSubmitting} />
+      </div>
+      <div className={styles.formGroup}>
+        <label className={styles.formLabel}>Mô tả ngắn <OptLabel /></label>
+        <textarea className={styles.formInput} placeholder="Mô tả về chức năng của Domain..."
+          value={domainForm.description} onChange={e => setDomainForm(p => ({ ...p, description: e.target.value }))}
+          style={{ height: 68, resize: 'none' }} disabled={isSubmitting} />
+      </div>
+      <div className={styles.formGroup}>
+        <label className={styles.formLabel}>Admin quản lý <OptLabel /></label>
+        <select className={styles.formSelect} value={domainForm.managerId} onChange={e => setDomainForm(p => ({ ...p, managerId: e.target.value }))} disabled={isSubmitting}>
+          <option value="">-- Chưa phân quyền --</option>
+          {subadmins.map(a => (
+            <option key={a.id} value={String(a.id)}>{a.last_name} {a.first_name} ({a.email})</option>
+          ))}
+        </select>
+      </div>
+    </>
+  );
+}
+
+function DomainTable() {
+  const { push: pushToast } = useToasts();
+  const [domains, setDomains]                   = useState([]);
+  const [departments, setDepartments]           = useState([]);
+  const [subadmins, setSubadmins]               = useState([]);
+  const [loading, setLoading]                   = useState(true);
+  const [isSubmitting, setIsSubmitting]         = useState(false);
   const [search, setSearch]                     = useState('');
   const [modal, setModal]                       = useState(null); // null | 'addDomain' | 'editDomain'
   const [editDomainTarget, setEditDomainTarget] = useState(null);
-  const [domainForm, setDomainForm]             = useState({ code: '', name: '', description: '', admin: '', pnl: '' });
+  const [domainForm, setDomainForm]             = useState({ code: '', name: '', description: '', department: '', managerId: '' });
   const [confirmDelete, setConfirmDelete]       = useState(null);
+
+  async function loadDomains() {
+    try {
+      setLoading(true);
+      const data = await getDomains();
+      setDomains(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Lỗi tải domain:', err);
+      pushToast(err.message || 'Không thể tải danh sách domain', 'error', '✕');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadDomains();
+  }, []);
+
+  // Fetch departments & subadmins when modal opens
+  useEffect(() => {
+    if (modal === 'addDomain' || modal === 'editDomain') {
+      async function fetchData() {
+        try {
+          const [depts, admins] = await Promise.all([getDepartments(), getSubadmins()]);
+          setDepartments(Array.isArray(depts) ? depts : []);
+          setSubadmins(Array.isArray(admins) ? admins : []);
+        } catch (err) {
+          console.error('Lỗi tải data:', err);
+        }
+      }
+      fetchData();
+    }
+  }, [modal]);
 
   const filtered = search
     ? domains.filter(d =>
@@ -364,73 +502,85 @@ function DomainTable({ domains, setDomains, apps, setApps }) {
     : domains;
 
   function openAddDomain() {
-    setDomainForm({ code: '', name: '', description: '', admin: '', pnl: '' });
+    setDomainForm({ code: '', name: '', description: '', department: '', managerId: '' });
     setModal('addDomain');
   }
 
   function openEditDomain(d) {
     setEditDomainTarget(d);
-    setDomainForm({ code: d.code, name: d.name, description: d.description || '', admin: d.admin || '', pnl: d.pnl || '' });
+    setDomainForm({
+      code: d.code,
+      name: d.name,
+      description: d.description || '',
+      department: d.department ? String(d.department) : '',
+      managerId: (d.managers && d.managers.length > 0) ? String(d.managers[0].id) : '',
+    });
     setModal('editDomain');
   }
 
-  function handleAddDomain(e) {
+  async function handleAddDomain(e) {
     e.preventDefault();
-    const code = domainForm.code.trim().toUpperCase();
-    if (!code || domains.find(d => d.code === code)) return;
-    setDomains(p => [...p, { id: Date.now(), code, name: domainForm.name, description: domainForm.description, admin: domainForm.admin, pnl: domainForm.pnl }]);
-    setModal(null);
-  }
+    if (isSubmitting) return;
 
-  function handleEditDomain(e) {
-    e.preventDefault();
-    const newCode = domainForm.code.trim().toUpperCase();
-    const oldCode = editDomainTarget.code;
-    setDomains(p => p.map(d => d.id === editDomainTarget.id
-      ? { ...d, code: newCode, name: domainForm.name, description: domainForm.description, admin: domainForm.admin, pnl: domainForm.pnl }
-      : d
-    ));
-    if (newCode !== oldCode) {
-      setApps(p => p.map(a => a.domain === oldCode ? { ...a, domain: newCode } : a));
+    try {
+      setIsSubmitting(true);
+      const payload = {
+        name: domainForm.name,
+        code: domainForm.code.trim().toUpperCase(),
+        description: domainForm.description,
+        department: domainForm.department,
+        manager_ids: domainForm.managerId ? [parseInt(domainForm.managerId)] : [],
+      };
+
+      await createDomain(payload);
+      pushToast(`Đã tạo domain ${payload.code} thành công`, 'success', '✓');
+      await loadDomains();
+      setModal(null);
+    } catch (err) {
+      console.error('Lỗi tạo domain:', err);
+      pushToast(err.message || 'Không thể tạo domain', 'error', '✕');
+    } finally {
+      setIsSubmitting(false);
     }
-    setModal(null);
   }
 
-  function DomainFormFields() {
-    return (
-      <>
-        <div className={styles.formGroup}>
-          <label className={styles.formLabel}>Mã Domain <span className={styles.required}>*</span></label>
-          <input className={styles.formInput} type="text" placeholder="VD: INFRA" required autoFocus
-            value={domainForm.code} onChange={e => setDomainForm(p => ({ ...p, code: e.target.value.toUpperCase() }))} />
-        </div>
-        <div className={styles.formGroup}>
-          <label className={styles.formLabel}>Tên Domain</label>
-          <input className={styles.formInput} type="text" placeholder="VD: Hạ tầng mạng"
-            value={domainForm.name} onChange={e => setDomainForm(p => ({ ...p, name: e.target.value }))} />
-        </div>
-        <div className={styles.formGroup}>
-          <label className={styles.formLabel}>PNL <OptLabel /></label>
-          <select className={styles.formSelect} value={domainForm.pnl} onChange={e => setDomainForm(p => ({ ...p, pnl: e.target.value }))}>
-            <option value="">— Chưa chọn —</option>
-            {INIT_PNLS.map(p => (
-              <option key={p.id} value={p.code}>{p.code} — {p.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className={styles.formGroup}>
-          <label className={styles.formLabel}>Mô tả ngắn <OptLabel /></label>
-          <textarea className={styles.formInput} placeholder="Mô tả về chức năng của Domain..."
-            value={domainForm.description} onChange={e => setDomainForm(p => ({ ...p, description: e.target.value }))}
-            style={{ height: 68, resize: 'none' }} />
-        </div>
-        <div className={styles.formGroup}>
-          <label className={styles.formLabel}>Admin quản lý <OptLabel /></label>
-          <input className={styles.formInput} type="text" placeholder="VD: admin@company.com"
-            value={domainForm.admin} onChange={e => setDomainForm(p => ({ ...p, admin: e.target.value }))} />
-        </div>
-      </>
-    );
+  async function handleEditDomain(e) {
+    e.preventDefault();
+    if (isSubmitting) return;
+
+    try {
+      setIsSubmitting(true);
+      const payload = {
+        name: domainForm.name,
+        code: domainForm.code.trim().toUpperCase(),
+        description: domainForm.description,
+        department: domainForm.department,
+        manager_ids: domainForm.managerId ? [parseInt(domainForm.managerId)] : [],
+      };
+
+      await updateDomain(editDomainTarget.id, payload);
+      pushToast(`Đã cập nhật domain ${payload.code} thành công`, 'success', '✓');
+      await loadDomains();
+      setModal(null);
+    } catch (err) {
+      console.error('Lỗi sửa domain:', err);
+      pushToast(err.message || 'Không thể cập nhật domain', 'error', '✕');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleDeleteDomain(id) {
+    try {
+      await deleteDomain(id);
+      pushToast('Đã xóa domain thành công', 'success', '✓');
+      setDomains(p => p.filter(d => d.id !== id));
+    } catch (err) {
+      console.error('Lỗi xóa domain:', err);
+      pushToast(err.message || 'Không thể xóa domain', 'error', '✕');
+    } finally {
+      setConfirmDelete(null);
+    }
   }
 
   return (
@@ -458,23 +608,28 @@ function DomainTable({ domains, setDomains, apps, setApps }) {
             </tr>
           </thead>
           <tbody>
-            {filtered.length > 0 ? filtered.map(d => {
-              const pnlObj = INIT_PNLS.find(p => p.code === d.pnl);
-              return (
+            {loading ? (
+              <tr><td colSpan={7} className={styles.mgmtEmpty}>Đang tải...</td></tr>
+            ) : filtered.length > 0 ? filtered.map(d => (
               <tr key={d.id} className={styles.mgmtRow}>
                 <td><span className={styles.mgmtDomainTag} style={{ fontFamily: 'IBM Plex Mono, monospace' }}>{d.code}</span></td>
                 <td style={{ fontSize: '0.88rem' }}>{d.name || <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>—</span>}</td>
                 <td>
-                  {pnlObj
-                    ? <span className={styles.mgmtBadge} style={{ background: 'rgba(99,108,220,0.12)', color: '#6b74e0' }}>{pnlObj.code}</span>
+                  {d.department_name
+                    ? <span className={styles.mgmtBadge} style={{ background: 'rgba(99,108,220,0.12)', color: '#6b74e0' }}>{d.department_name}</span>
                     : <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.8rem' }}>—</span>
                   }
                 </td>
                 <td style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', maxWidth: 180 }}>{d.description || <span style={{ fontStyle: 'italic' }}>—</span>}</td>
-                <td style={{ fontSize: '0.83rem', color: 'var(--text-secondary)' }}>{d.admin || <span style={{ fontStyle: 'italic' }}>Chưa phân quyền</span>}</td>
+                <td style={{ fontSize: '0.83rem', color: 'var(--text-secondary)' }}>
+                  {d.managers && d.managers.length > 0
+                    ? d.managers.map(m => `${m.last_name} ${m.first_name}`).join(', ')
+                    : <span style={{ fontStyle: 'italic' }}>Chưa phân quyền</span>
+                  }
+                </td>
                 <td>
                   <span className={styles.mgmtBadge} style={{ background: 'rgba(139,133,193,0.13)', color: '#a09ab9' }}>
-                    {apps.filter(a => a.domain === d.code).length} app
+                    {d.application_count ?? 0} app
                   </span>
                 </td>
                 <td>
@@ -484,7 +639,7 @@ function DomainTable({ domains, setDomains, apps, setApps }) {
                   </div>
                 </td>
               </tr>
-            )}) : (
+            )) : (
               <tr><td colSpan={7} className={styles.mgmtEmpty}>Không tìm thấy domain nào.</td></tr>
             )}
           </tbody>
@@ -496,13 +651,17 @@ function DomainTable({ domains, setDomains, apps, setApps }) {
           <div className={styles.modalBox} onClick={e => e.stopPropagation()} style={{ maxWidth: 380 }}>
             <div className={styles.modalHeader}>
               <h3 className={styles.modalTitle}>Tạo Domain mới</h3>
-              <button className={styles.modalClose} onClick={() => setModal(null)}>✕</button>
+              <button className={styles.modalClose} onClick={() => setModal(null)} disabled={isSubmitting}>✕</button>
             </div>
             <form className={styles.modalForm} onSubmit={handleAddDomain}>
-              <DomainFormFields />
+              <DomainFormFields
+                domainForm={domainForm} setDomainForm={setDomainForm}
+                departments={departments} subadmins={subadmins}
+                isSubmitting={isSubmitting}
+              />
               <div className={styles.modalActions}>
-                <button type="button" className={styles.btnSecondary} onClick={() => setModal(null)}>Hủy</button>
-                <button type="submit" className={styles.btnPrimary}>Tạo mới</button>
+                <button type="button" className={styles.btnSecondary} onClick={() => setModal(null)} disabled={isSubmitting}>Hủy</button>
+                <button type="submit" className={styles.btnPrimary} disabled={isSubmitting}>{isSubmitting ? 'Đang tạo...' : 'Tạo mới'}</button>
               </div>
             </form>
           </div>
@@ -514,13 +673,17 @@ function DomainTable({ domains, setDomains, apps, setApps }) {
           <div className={styles.modalBox} onClick={e => e.stopPropagation()} style={{ maxWidth: 380 }}>
             <div className={styles.modalHeader}>
               <h3 className={styles.modalTitle}>Sửa Domain: {editDomainTarget.code}</h3>
-              <button className={styles.modalClose} onClick={() => setModal(null)}>✕</button>
+              <button className={styles.modalClose} onClick={() => setModal(null)} disabled={isSubmitting}>✕</button>
             </div>
             <form className={styles.modalForm} onSubmit={handleEditDomain}>
-              <DomainFormFields />
+              <DomainFormFields
+                domainForm={domainForm} setDomainForm={setDomainForm}
+                departments={departments} subadmins={subadmins}
+                isSubmitting={isSubmitting}
+              />
               <div className={styles.modalActions}>
-                <button type="button" className={styles.btnSecondary} onClick={() => setModal(null)}>Hủy</button>
-                <button type="submit" className={styles.btnPrimary}>Lưu thay đổi</button>
+                <button type="button" className={styles.btnSecondary} onClick={() => setModal(null)} disabled={isSubmitting}>Hủy</button>
+                <button type="submit" className={styles.btnPrimary} disabled={isSubmitting}>{isSubmitting ? 'Đang lưu...' : 'Lưu thay đổi'}</button>
               </div>
             </form>
           </div>
@@ -531,7 +694,7 @@ function DomainTable({ domains, setDomains, apps, setApps }) {
         <ConfirmModal
           label={confirmDelete.label}
           onCancel={() => setConfirmDelete(null)}
-          onConfirm={() => { setDomains(p => p.filter(d => d.id !== confirmDelete.id)); setConfirmDelete(null); }}
+          onConfirm={() => handleDeleteDomain(confirmDelete.id)}
         />
       )}
     </div>
@@ -540,14 +703,42 @@ function DomainTable({ domains, setDomains, apps, setApps }) {
 
 // ── User management ──────────────────────────────────────────────
 
-const EMPTY_USER_FORM = { last_name: '', first_name: '', email: '', password: '', roles: [] };
+const EMPTY_USER_FORM = { last_name: '', first_name: '', email: '', password: '', is_active: true, roles: [] };
 
-function UserTable({ users, setUsers }) {
+function rolesFromUser(u) {
+  const roles = [];
+  if (u.is_owner) roles.push('owner');
+  if (u.is_subadmin) roles.push('sub-admin');
+  return roles;
+}
+
+function UserTable() {
+  const { push: pushToast } = useToasts();
+  const [users, setUsers]                 = useState([]);
+  const [loading, setLoading]             = useState(true);
+  const [isSubmitting, setIsSubmitting]   = useState(false);
   const [search, setSearch]               = useState('');
   const [modal, setModal]                 = useState(null); // null | 'addUser' | 'editUser'
   const [userForm, setUserForm]           = useState(EMPTY_USER_FORM);
   const [editUserTarget, setEditUserTarget] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
+
+  async function loadUsers() {
+    try {
+      setLoading(true);
+      const data = await getUsers();
+      setUsers(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Lỗi tải user:', err);
+      pushToast(err.message || 'Không thể tải danh sách user', 'error', '✕');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
 
   const filtered = search
     ? users.filter(u =>
@@ -565,30 +756,72 @@ function UserTable({ users, setUsers }) {
 
   function openEditUser(u) {
     setEditUserTarget(u);
-    setUserForm({ last_name: u.last_name, first_name: u.first_name, email: u.email, password: '', roles: u.roles });
+    setUserForm({ last_name: u.last_name, first_name: u.first_name, email: u.email, password: '', is_active: u.is_active, roles: rolesFromUser(u) });
     setModal('editUser');
   }
 
-  function handleAddUser(e) {
+  async function handleAddUser(e) {
     e.preventDefault();
-    setUsers(p => [...p, {
-      id: Date.now(),
-      last_name: userForm.last_name,
-      first_name: userForm.first_name,
-      email: userForm.email,
-      roles: userForm.roles,
-    }]);
-    setUserForm(EMPTY_USER_FORM);
-    setModal(null);
+    if (isSubmitting) return;
+
+    try {
+      setIsSubmitting(true);
+      await createUser({
+        email: userForm.email,
+        password: userForm.password,
+        first_name: userForm.first_name,
+        last_name: userForm.last_name,
+        is_subadmin: userForm.roles.includes('sub-admin'),
+        is_owner: userForm.roles.includes('owner'),
+      });
+      pushToast(`Đã tạo user ${userForm.email} thành công`, 'success', '✓');
+      await loadUsers();
+      setUserForm(EMPTY_USER_FORM);
+      setModal(null);
+    } catch (err) {
+      console.error('Lỗi tạo user:', err);
+      pushToast(err.message || 'Không thể tạo user', 'error', '✕');
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
-  function handleEditUser(e) {
+  async function handleEditUser(e) {
     e.preventDefault();
-    setUsers(p => p.map(u => u.id === editUserTarget.id
-      ? { ...u, last_name: userForm.last_name, first_name: userForm.first_name, email: userForm.email, roles: userForm.roles }
-      : u
-    ));
-    setModal(null);
+    if (isSubmitting) return;
+
+    try {
+      setIsSubmitting(true);
+      await updateUser(editUserTarget.id, {
+        email: userForm.email,
+        first_name: userForm.first_name,
+        last_name: userForm.last_name,
+        is_active: userForm.is_active,
+        is_subadmin: userForm.roles.includes('sub-admin'),
+        is_owner: userForm.roles.includes('owner'),
+      });
+      pushToast(`Đã cập nhật user ${userForm.email} thành công`, 'success', '✓');
+      await loadUsers();
+      setModal(null);
+    } catch (err) {
+      console.error('Lỗi sửa user:', err);
+      pushToast(err.message || 'Không thể cập nhật user', 'error', '✕');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleDeleteUser(id) {
+    try {
+      await deleteUser(id);
+      pushToast('Đã xóa user thành công', 'success', '✓');
+      setUsers(p => p.filter(u => u.id !== id));
+    } catch (err) {
+      console.error('Lỗi xóa user:', err);
+      pushToast(err.message || 'Không thể xóa user', 'error', '✕');
+    } finally {
+      setConfirmDelete(null);
+    }
   }
 
   return (
@@ -616,11 +849,14 @@ function UserTable({ users, setUsers }) {
               <th>Họ tên</th>
               <th>Email</th>
               <th>Vai trò</th>
+              <th>Trạng thái</th>
               <th style={{ width: 72 }}></th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map(u => (
+            {loading ? (
+              <tr><td colSpan={5} className={styles.mgmtEmpty}>Đang tải...</td></tr>
+            ) : filtered.length > 0 ? filtered.map(u => (
               <tr key={u.id} className={styles.mgmtRow}>
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -633,13 +869,19 @@ function UserTable({ users, setUsers }) {
                 <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{u.email}</td>
                 <td>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {u.roles.includes('sub-admin') && (
+                    {u.is_subadmin && (
                       <span className={styles.mgmtBadge} style={{ background: 'rgba(222,26,26,0.11)', color: '#ff6b6b' }}>Admin</span>
                     )}
-                    {u.roles.includes('owner') && (
+                    {u.is_owner && (
                       <span className={styles.mgmtBadge} style={{ background: 'rgba(46,204,113,0.12)', color: '#2ecc71' }}>Owner</span>
                     )}
                   </div>
+                </td>
+                <td>
+                  <span className={styles.mgmtBadge} style={u.is_active
+                    ? { background: 'rgba(46,204,113,0.12)', color: '#2ecc71' }
+                    : { background: 'rgba(160,154,185,0.1)', color: 'var(--text-secondary)' }
+                  }>{u.is_active ? '● Hoạt động' : '○ Tạm dừng'}</span>
                 </td>
                 <td>
                   <div style={{ display: 'flex', gap: 4 }}>
@@ -648,7 +890,9 @@ function UserTable({ users, setUsers }) {
                   </div>
                 </td>
               </tr>
-            ))}
+            )) : (
+              <tr><td colSpan={5} className={styles.mgmtEmpty}>Không tìm thấy user nào.</td></tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -657,7 +901,7 @@ function UserTable({ users, setUsers }) {
         <ConfirmModal
           label={confirmDelete.label}
           onCancel={() => setConfirmDelete(null)}
-          onConfirm={() => { setUsers(p => p.filter(u => u.id !== confirmDelete.id)); setConfirmDelete(null); }}
+          onConfirm={() => handleDeleteUser(confirmDelete.id)}
         />
       )}
 
@@ -667,30 +911,30 @@ function UserTable({ users, setUsers }) {
           <div className={styles.modalBox} onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
             <div className={styles.modalHeader}>
               <h3 className={styles.modalTitle}>Tạo Tài Khoản</h3>
-              <button className={styles.modalClose} onClick={() => setModal(null)}>✕</button>
+              <button className={styles.modalClose} onClick={() => setModal(null)} disabled={isSubmitting}>✕</button>
             </div>
             <form className={styles.modalForm} onSubmit={handleAddUser}>
               <div className={styles.formRow}>
                 <div className={styles.formGroup} style={{ flex: 1 }}>
                   <label className={styles.formLabel}>Họ <span className={styles.required}>*</span></label>
                   <input className={styles.formInput} type="text" placeholder="Nguyễn" required autoFocus
-                    value={userForm.last_name} onChange={e => setUserForm(p => ({ ...p, last_name: e.target.value }))} />
+                    value={userForm.last_name} onChange={e => setUserForm(p => ({ ...p, last_name: e.target.value }))} disabled={isSubmitting} />
                 </div>
                 <div className={styles.formGroup} style={{ flex: 1 }}>
                   <label className={styles.formLabel}>Tên <span className={styles.required}>*</span></label>
                   <input className={styles.formInput} type="text" placeholder="Văn A" required
-                    value={userForm.first_name} onChange={e => setUserForm(p => ({ ...p, first_name: e.target.value }))} />
+                    value={userForm.first_name} onChange={e => setUserForm(p => ({ ...p, first_name: e.target.value }))} disabled={isSubmitting} />
                 </div>
               </div>
               <div className={styles.formGroup}>
                 <label className={styles.formLabel}>Email <span className={styles.required}>*</span></label>
                 <input className={styles.formInput} type="email" placeholder="user@company.com" required
-                  value={userForm.email} onChange={e => setUserForm(p => ({ ...p, email: e.target.value }))} />
+                  value={userForm.email} onChange={e => setUserForm(p => ({ ...p, email: e.target.value }))} disabled={isSubmitting} />
               </div>
               <div className={styles.formGroup}>
                 <label className={styles.formLabel}>Mật khẩu <span className={styles.required}>*</span></label>
                 <input className={styles.formInput} type="password" placeholder="Tối thiểu 8 ký tự" required
-                  value={userForm.password} onChange={e => setUserForm(p => ({ ...p, password: e.target.value }))} />
+                  value={userForm.password} onChange={e => setUserForm(p => ({ ...p, password: e.target.value }))} disabled={isSubmitting} />
               </div>
               <div className={styles.formGroup}>
                 <label className={styles.formLabel}>Vai trò <OptLabel /></label>
@@ -701,7 +945,7 @@ function UserTable({ users, setUsers }) {
                   ].map(r => (
                     <label key={r.key} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text-primary)' }}>
                       <input type="checkbox" checked={userForm.roles.includes(r.key)} onChange={() => toggleRole(r.key)}
-                        style={{ width: 15, height: 15, accentColor: 'var(--color-red)', cursor: 'pointer' }} />
+                        style={{ width: 15, height: 15, accentColor: 'var(--color-red)', cursor: 'pointer' }} disabled={isSubmitting} />
                       {r.label}
                     </label>
                   ))}
@@ -711,8 +955,8 @@ function UserTable({ users, setUsers }) {
                 </p>
               </div>
               <div className={styles.modalActions}>
-                <button type="button" className={styles.btnSecondary} onClick={() => setModal(null)}>Hủy</button>
-                <button type="submit" className={styles.btnPrimary}>Tạo tài khoản</button>
+                <button type="button" className={styles.btnSecondary} onClick={() => setModal(null)} disabled={isSubmitting}>Hủy</button>
+                <button type="submit" className={styles.btnPrimary} disabled={isSubmitting}>{isSubmitting ? 'Đang tạo...' : 'Tạo tài khoản'}</button>
               </div>
             </form>
           </div>
@@ -725,25 +969,25 @@ function UserTable({ users, setUsers }) {
           <div className={styles.modalBox} onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
             <div className={styles.modalHeader}>
               <h3 className={styles.modalTitle}>Sửa: {editUserTarget.last_name} {editUserTarget.first_name}</h3>
-              <button className={styles.modalClose} onClick={() => setModal(null)}>✕</button>
+              <button className={styles.modalClose} onClick={() => setModal(null)} disabled={isSubmitting}>✕</button>
             </div>
             <form className={styles.modalForm} onSubmit={handleEditUser}>
               <div className={styles.formRow}>
                 <div className={styles.formGroup} style={{ flex: 1 }}>
                   <label className={styles.formLabel}>Họ <span className={styles.required}>*</span></label>
                   <input className={styles.formInput} type="text" required autoFocus
-                    value={userForm.last_name} onChange={e => setUserForm(p => ({ ...p, last_name: e.target.value }))} />
+                    value={userForm.last_name} onChange={e => setUserForm(p => ({ ...p, last_name: e.target.value }))} disabled={isSubmitting} />
                 </div>
                 <div className={styles.formGroup} style={{ flex: 1 }}>
                   <label className={styles.formLabel}>Tên <span className={styles.required}>*</span></label>
                   <input className={styles.formInput} type="text" required
-                    value={userForm.first_name} onChange={e => setUserForm(p => ({ ...p, first_name: e.target.value }))} />
+                    value={userForm.first_name} onChange={e => setUserForm(p => ({ ...p, first_name: e.target.value }))} disabled={isSubmitting} />
                 </div>
               </div>
               <div className={styles.formGroup}>
                 <label className={styles.formLabel}>Email <span className={styles.required}>*</span></label>
                 <input className={styles.formInput} type="email" required
-                  value={userForm.email} onChange={e => setUserForm(p => ({ ...p, email: e.target.value }))} />
+                  value={userForm.email} onChange={e => setUserForm(p => ({ ...p, email: e.target.value }))} disabled={isSubmitting} />
               </div>
               <div className={styles.formGroup}>
                 <label className={styles.formLabel}>Vai trò <OptLabel /></label>
@@ -754,15 +998,23 @@ function UserTable({ users, setUsers }) {
                   ].map(r => (
                     <label key={r.key} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text-primary)' }}>
                       <input type="checkbox" checked={userForm.roles.includes(r.key)} onChange={() => toggleRole(r.key)}
-                        style={{ width: 15, height: 15, accentColor: 'var(--color-red)', cursor: 'pointer' }} />
+                        style={{ width: 15, height: 15, accentColor: 'var(--color-red)', cursor: 'pointer' }} disabled={isSubmitting} />
                       {r.label}
                     </label>
                   ))}
                 </div>
               </div>
+              <div className={styles.formGroup} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <input type="checkbox" id="chkUserActive" checked={userForm.is_active}
+                  onChange={e => setUserForm(p => ({ ...p, is_active: e.target.checked }))}
+                  style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--color-red)' }} disabled={isSubmitting} />
+                <label htmlFor="chkUserActive" className={styles.formLabel} style={{ cursor: 'pointer', textTransform: 'none', letterSpacing: 0 }}>
+                  Đang hoạt động
+                </label>
+              </div>
               <div className={styles.modalActions}>
-                <button type="button" className={styles.btnSecondary} onClick={() => setModal(null)}>Hủy</button>
-                <button type="submit" className={styles.btnPrimary}>Lưu thay đổi</button>
+                <button type="button" className={styles.btnSecondary} onClick={() => setModal(null)} disabled={isSubmitting}>Hủy</button>
+                <button type="submit" className={styles.btnPrimary} disabled={isSubmitting}>{isSubmitting ? 'Đang lưu...' : 'Lưu thay đổi'}</button>
               </div>
             </form>
           </div>
@@ -775,10 +1027,7 @@ function UserTable({ users, setUsers }) {
 // ── TabManage export ────────────────────────────────────────────
 
 export function TabManage({ onBack }) {
-  const [tab, setTab]         = useState('app');
-  const [apps, setApps]       = useState(INIT_APPS);
-  const [domains, setDomains] = useState(INIT_DOMAINS);
-  const [users, setUsers]     = useState(INIT_USERS);
+  const [tab, setTab] = useState('app');
 
   return (
     <div>
@@ -808,9 +1057,9 @@ export function TabManage({ onBack }) {
         </div>
       </div>
 
-      {tab === 'app'    && <AppTable    apps={apps}       setApps={setApps}       domains={domains} />}
-      {tab === 'domain' && <DomainTable domains={domains} setDomains={setDomains} apps={apps} setApps={setApps} />}
-      {tab === 'user'   && <UserTable   users={users}     setUsers={setUsers} />}
+      {tab === 'app'    && <AppTable />}
+      {tab === 'domain' && <DomainTable />}
+      {tab === 'user'   && <UserTable />}
     </div>
   );
 }

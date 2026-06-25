@@ -27,6 +27,7 @@ export const STATUS_LABEL = {
   rejected_by_admin: { label: 'Bị từ chối',   cls: 'badgeRejected' },
   approved:          { label: 'Đã duyệt',      cls: 'badgeApproved' },
   rejected_by_owner: { label: 'Owner từ chối', cls: 'badgeRejected' },
+  cancelled:         { label: 'Đã hủy',        cls: 'badgeRejected' },
 };
 
 export function StatusBadge({ status }) {

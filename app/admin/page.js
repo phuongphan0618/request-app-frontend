@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '../../lib/useTheme';
 import { getCurrentUser } from '../../lib/api';
@@ -9,10 +9,11 @@ import styles from '../app/App.module.css';
 
 import { useToasts, ToastStack } from '../app/helpers';
 import { RejectReasonModal } from '../app/RejectReasonModal';
+import { RevertReasonModal } from '../app/RevertReasonModal';
 import { TabAdmin } from '../app/TabAdmin';
 import { TabManage } from '../app/TabManage';
 import { BatchQueue } from '../app/BatchQueue';
-import { getAccessRequests } from '../../lib/api';
+import { getAccessRequests, approveAccessRequest, rejectAccessRequest, revertAccessRequest } from '../../lib/api';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -24,6 +25,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [queue, setQueue] = useState([]);
   const [rejectTarget, setRejectTarget] = useState(null);
+  const [revertTarget, setRevertTarget] = useState(null);
   const [adminView, setAdminView] = useState('requests'); // 'requests' | 'manage'
   const { toasts, push: pushToast } = useToasts();
 
@@ -42,49 +44,108 @@ export default function AdminPage() {
 
     if (roles.includes('sub-admin')) {
       setHasAccess(true);
-
-      // Fetch access requests from API
-      async function fetchRequests() {
-        try {
-          setLoading(true);
-          const requests = await getAccessRequests();
-          setAllRequests(requests || []);
-        } catch (err) {
-          console.error('Lỗi tải requests:', err);
-          pushToast('Không thể tải danh sách requests', 'error', '✕');
-        } finally {
-          setLoading(false);
-        }
-      }
-
-      fetchRequests();
     } else {
       setHasAccess(false);
       setLoading(false);
     }
-  }, [router, pushToast]);
+  }, [router]);
+
+  // Tự động cập nhật danh sách requests, không cần người dùng chủ động refresh
+  const inFlightRef = useRef(false);
+
+  useEffect(() => {
+    if (!hasAccess) return;
+
+    let cancelled = false;
+
+    async function fetchRequests(isInitial) {
+      if (inFlightRef.current) return; // bỏ qua nếu lần fetch trước chưa xong
+      inFlightRef.current = true;
+      try {
+        if (isInitial) setLoading(true);
+        const requests = await getAccessRequests();
+        if (!cancelled) setAllRequests(requests || []);
+      } catch (err) {
+        console.error('Lỗi tải requests:', err);
+        if (isInitial) pushToast('Không thể tải danh sách requests', 'error', '✕');
+      } finally {
+        if (isInitial) setLoading(false);
+        inFlightRef.current = false;
+      }
+    }
+
+    fetchRequests(true);
+    const interval = setInterval(() => fetchRequests(false), 800);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [hasAccess, pushToast]);
 
   const pendingAdmin = allRequests.filter(r => r.status === 'pending_admin').length;
 
-  function handleAdminApprove(req) {
-    const newEntries = req.items
-      .filter(item => !queue.find(e => e.item.id === item.id))
-      .map(item => ({ request: req, item }));
-    if (newEntries.length === 0) return;
-    setQueue(p => [...p, ...newEntries]);
-    setAllRequests(p => p.map(r => r.id === req.id ? { ...r, status: 'pending_owner' } : r));
-    const owners = [...new Set(req.items.map(i => i.owner_name))];
-    pushToast(`${req.id} → ${newEntries.length} item vào ${owners.length} batch`, 'success', '✓');
+  async function handleAdminApprove(req) {
+    try {
+      await approveAccessRequest(req.id);
+      const newEntries = req.items
+        .filter(item => !queue.find(e => e.item.id === item.id))
+        .map(item => ({ request: req, item }));
+      if (newEntries.length > 0) setQueue(p => [...p, ...newEntries]);
+      setAllRequests(p => p.map(r => r.id === req.id ? { ...r, status: 'pending_owner' } : r));
+      const owners = [...new Set(req.items.map(i => i.owner_name))];
+      pushToast(`${req.id} → ${newEntries.length} item vào ${owners.length} batch`, 'success', '✓');
+    } catch (err) {
+      console.error('Lỗi duyệt request:', err);
+      pushToast(err.message || 'Không thể duyệt yêu cầu', 'error', '✕');
+    }
   }
 
   function handleAdminReject(req) {
     setRejectTarget(req);
   }
 
-  function handleRejectConfirm(req, reason) {
-    setAllRequests(p => p.map(r => r.id === req.id ? { ...r, status: 'rejected_by_admin', reject_note: reason } : r));
-    setRejectTarget(null);
-    pushToast(`Đã từ chối ${req.id}`, 'info', '✕');
+  async function handleRejectConfirm(req, reason) {
+    try {
+      await rejectAccessRequest(req.id, reason);
+      setAllRequests(p => p.map(r => r.id === req.id ? { ...r, status: 'rejected_by_admin', review_note: reason } : r));
+      setRejectTarget(null);
+      pushToast(`Đã từ chối ${req.id}`, 'info', '✕');
+    } catch (err) {
+      console.error('Lỗi từ chối request:', err);
+      pushToast(err.message || 'Không thể từ chối yêu cầu', 'error', '✕');
+    }
+  }
+
+  function handleAdminRevertOpen(req) {
+    setRevertTarget(req);
+  }
+
+  async function handleRevertConfirm(req, reason) {
+    try {
+      await revertAccessRequest(req.id, reason);
+
+      if (req.status === 'rejected_by_admin') {
+        // Hoàn tác từ chối → coi như duyệt lại: chuyển chờ owner, tách item vào batch theo owner
+        const newEntries = req.items
+          .filter(item => !queue.find(e => e.item.id === item.id))
+          .map(item => ({ request: req, item }));
+        if (newEntries.length > 0) setQueue(p => [...p, ...newEntries]);
+        setAllRequests(p => p.map(r => r.id === req.id ? { ...r, status: 'pending_owner', review_note: null } : r));
+        const owners = [...new Set(req.items.map(i => i.owner_name))];
+        pushToast(`Đã hoàn tác ${req.id} → ${newEntries.length} item vào ${owners.length} batch`, 'info', '↩');
+      } else {
+        // Hoàn tác duyệt (pending_owner/completed) → coi như từ chối: chuyển đã xử lý, rút item khỏi batch
+        setQueue(p => p.filter(e => e.request.id !== req.id));
+        setAllRequests(p => p.map(r => r.id === req.id ? { ...r, status: 'rejected_by_admin', review_note: reason } : r));
+        pushToast(`Đã hoàn tác ${req.id} → chuyển sang bị từ chối`, 'info', '↩');
+      }
+
+      setRevertTarget(null);
+    } catch (err) {
+      console.error('Lỗi hoàn tác request:', err);
+      pushToast(err.message || 'Không thể hoàn tác yêu cầu', 'error', '✕');
+    }
   }
 
   function handleRemoveItem(requestId, itemId) {
@@ -196,6 +257,14 @@ export default function AdminPage() {
         />
       )}
 
+      {revertTarget && (
+        <RevertReasonModal
+          req={revertTarget}
+          onCancel={() => setRevertTarget(null)}
+          onConfirm={handleRevertConfirm}
+        />
+      )}
+
       {/* ── Sidebar ── */}
       <aside className={styles.sidebar}>
         <div className={styles.sidebarTop}>
@@ -258,7 +327,7 @@ export default function AdminPage() {
           ) : adminView === 'manage' ? (
             <TabManage onBack={() => setAdminView('requests')} />
           ) : (
-            <TabAdmin requests={allRequests} queue={queue} onApprove={handleAdminApprove} onReject={handleAdminReject} onManage={() => setAdminView('manage')} />
+            <TabAdmin requests={allRequests} queue={queue} onApprove={handleAdminApprove} onReject={handleAdminReject} onRevert={handleAdminRevertOpen} onManage={() => setAdminView('manage')} />
           )}
         </div>
       </main>

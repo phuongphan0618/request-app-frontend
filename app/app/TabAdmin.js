@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from './App.module.css';
 import { fmtDate, fmtDateTime, calcWait, StatusBadge } from './helpers';
+import { getAccessRequest } from '../../lib/api';
 
 // ── Shared icons ─────────────────────────────────────────────
 
@@ -18,7 +19,7 @@ export function ClockIcon() {
 
 // ── Request Card ─────────────────────────────────────────────
 
-function RequestCard({ req, isQueued, isSelected, isDimmed, onClick, onApprove, onReject, isPending }) {
+function RequestCard({ req, isQueued, isSelected, isDimmed, onClick, onApprove, onReject, onRevert, isPending, canRevert }) {
   return (
     <div
       className={[
@@ -78,8 +79,16 @@ function RequestCard({ req, isQueued, isSelected, isDimmed, onClick, onApprove, 
           >✗</button>
         </div>
       ) : (
-        <div className={styles.reqCardFooter} style={{ justifyContent: 'center' }}>
+        <div className={styles.reqCardFooter} style={{ justifyContent: canRevert ? 'space-between' : 'center', alignItems: 'center' }}>
           <StatusBadge status={req.status} />
+          {canRevert && (
+            <button
+              className={styles.btnSecondary}
+              style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 500 }}
+              title="Hoàn tác về chờ admin"
+              onClick={e => { e.stopPropagation(); onRevert(req); }}
+            >Hoàn tác</button>
+          )}
         </div>
       )}
     </div>
@@ -88,8 +97,31 @@ function RequestCard({ req, isQueued, isSelected, isDimmed, onClick, onApprove, 
 
 // ── Detail Panel ──────────────────────────────────────────────
 
-function DetailPanel({ req, isQueued, onClose, onApprove, onReject }) {
-  const isPending = req.status === 'pending_admin';
+function DetailPanel({ req, isQueued, onClose, onApprove, onReject, onRevert, canRevert }) {
+  const [detail, setDetail] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    async function fetchDetail() {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await getAccessRequest(req.id);
+        setDetail(data);
+      } catch (err) {
+        console.error('Lỗi tải chi tiết request:', err);
+        setError(err.message || 'Không thể tải chi tiết');
+        setDetail(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchDetail();
+  }, [req.id]);
+
+  const displayReq = detail || req;
+  const isPending = displayReq.status === 'pending_admin';
 
   return (
     <div className={styles.detailPanel}>
@@ -119,74 +151,97 @@ function DetailPanel({ req, isQueued, onClose, onApprove, onReject }) {
             >✗ Từ chối</button>
           </div>
         )}
+        {canRevert && (
+          <div className={styles.dpActions}>
+            <button
+              className={styles.dpBtn}
+              onClick={() => { onRevert(req); onClose(); }}
+            >Hoàn tác</button>
+          </div>
+        )}
       </div>
 
       {/* Scrollable body */}
       <div className={styles.dpBody}>
 
-        {/* Thông tin chung */}
-        <div className={styles.dpSection}>
-          <div className={styles.dpSectionTitle}>Thông tin chung</div>
-          <div className={styles.dpInfoGrid}>
-            <div className={styles.dpInfoBlock}>
-              <span className={styles.dpInfoLabel}>Người yêu cầu</span>
-              <span className={styles.dpInfoValue}>{req.requester_name}</span>
-              <span className={styles.dpInfoSub}>{req.requester_email}</span>
-            </div>
-            <div className={styles.dpInfoBlock}>
-              <span className={styles.dpInfoLabel}>PNL</span>
-              <span className={styles.dpInfoValue}>{req.department_name}</span>
-            </div>
-            <div className={styles.dpInfoBlock}>
-              <span className={styles.dpInfoLabel}>Domain</span>
-              <span className={styles.dpInfoValue}>{req.domain_name}</span>
-            </div>
-            <div className={styles.dpInfoBlock}>
-              <span className={styles.dpInfoLabel}>Hạn xử lý</span>
-              <span className={styles.dpInfoValue}>{fmtDate(req.deadline)}</span>
-            </div>
-            <div className={styles.dpInfoBlock}>
-              <span className={styles.dpInfoLabel}>Ngày tạo</span>
-              <span className={styles.dpInfoValue}>{fmtDateTime(req.created_at)}</span>
-            </div>
-            <div className={styles.dpInfoBlock}>
-              <span className={styles.dpInfoLabel}>Thời gian chờ</span>
-              <span className={styles.dpInfoValue}>{calcWait(req.created_at)}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Lý do yêu cầu */}
-        {req.reason && (
-          <div className={styles.dpSection}>
-            <div className={styles.dpSectionTitle}>Lý do yêu cầu</div>
-            <p className={styles.dpReasonText}>{req.reason}</p>
+        {loading && (
+          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+            Đang tải chi tiết...
           </div>
         )}
 
-        {/* Ghi chú từ chối */}
-        {req.reject_note && (
-          <div className={styles.dpSection}>
-            <div className={styles.dpSectionTitle}>Ghi chú từ chối</div>
-            <p className={styles.dpRejectNote}>{req.reject_note}</p>
+        {error && (
+          <div style={{ padding: '1rem', background: 'rgba(255,107,107,0.1)', borderRadius: '0.375rem', color: '#ff6b6b', fontSize: '0.875rem', margin: '1rem' }}>
+            {error}
           </div>
         )}
 
-        {/* Danh sách ứng dụng */}
-        <div className={styles.dpSection}>
-          <div className={styles.dpSectionTitle}>Danh sách ứng dụng ({req.items.length})</div>
-          <div className={styles.dpItemList}>
-            {req.items.map(item => (
-              <div key={item.id} className={styles.dpItem}>
-                <span className={styles.dpItemApp}>{item.application_name}</span>
-                <div className={styles.dpItemOwner}>
-                  <span>{item.owner_name}</span>
-                  <span className={styles.dpItemOwnerEmail}>{item.owner_email}</span>
+        {!loading && !error && (
+          <>
+            {/* Thông tin chung */}
+            <div className={styles.dpSection}>
+              <div className={styles.dpSectionTitle}>Thông tin chung</div>
+              <div className={styles.dpInfoGrid}>
+                <div className={styles.dpInfoBlock}>
+                  <span className={styles.dpInfoLabel}>Người yêu cầu</span>
+                  <span className={styles.dpInfoValue}>{displayReq.requester_detail?.first_name} {displayReq.requester_detail?.last_name}</span>
+                  <span className={styles.dpInfoSub}>{displayReq.requester_detail?.email}</span>
+                </div>
+                <div className={styles.dpInfoBlock}>
+                  <span className={styles.dpInfoLabel}>PNL</span>
+                  <span className={styles.dpInfoValue}>{displayReq.department_name}</span>
+                </div>
+                <div className={styles.dpInfoBlock}>
+                  <span className={styles.dpInfoLabel}>Domain</span>
+                  <span className={styles.dpInfoValue}>{displayReq.domain_name}</span>
+                </div>
+                <div className={styles.dpInfoBlock}>
+                  <span className={styles.dpInfoLabel}>Hạn xử lý</span>
+                  <span className={styles.dpInfoValue}>{fmtDate(displayReq.deadline)}</span>
+                </div>
+                <div className={styles.dpInfoBlock}>
+                  <span className={styles.dpInfoLabel}>Ngày tạo</span>
+                  <span className={styles.dpInfoValue}>{fmtDateTime(displayReq.created_at)}</span>
+                </div>
+                <div className={styles.dpInfoBlock}>
+                  <span className={styles.dpInfoLabel}>Thời gian chờ</span>
+                  <span className={styles.dpInfoValue}>{calcWait(displayReq.created_at)}</span>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
+
+            {/* Lý do yêu cầu */}
+            {displayReq.reason && (
+              <div className={styles.dpSection}>
+                <div className={styles.dpSectionTitle}>Lý do yêu cầu</div>
+                <p className={styles.dpReasonText}>{displayReq.reason}</p>
+              </div>
+            )}
+
+            {/* Ghi chú từ chối */}
+            {displayReq.review_note && (
+              <div className={styles.dpSection}>
+                <div className={styles.dpSectionTitle}>Ghi chú từ chối</div>
+                <p className={styles.dpRejectNote}>{displayReq.review_note}</p>
+              </div>
+            )}
+
+            {/* Danh sách ứng dụng */}
+            <div className={styles.dpSection}>
+              <div className={styles.dpSectionTitle}>Danh sách ứng dụng ({displayReq.items.length})</div>
+              <div className={styles.dpItemList}>
+                {displayReq.items.map(item => (
+                  <div key={item.id} className={styles.dpItem}>
+                    <span className={styles.dpItemApp}>{item.application_name}</span>
+                    <div className={styles.dpItemOwner}>
+                      <span>{item.owner_email}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
 
       </div>
     </div>
@@ -215,7 +270,11 @@ function Pagination({ page, total, pageSize, onChange }) {
   );
 }
 
-export function TabAdmin({ requests, queue, onApprove, onReject, onManage }) {
+function canRevertStatus(status) {
+  return status === 'pending_owner' || status === 'completed' || status === 'rejected_by_admin';
+}
+
+export function TabAdmin({ requests, queue, onApprove, onReject, onRevert, onManage }) {
   const [sub, setSub]           = useState('pending');
   const [search, setSearch]     = useState('');
   const [selected, setSelected] = useState(null);
@@ -247,6 +306,11 @@ export function TabAdmin({ requests, queue, onApprove, onReject, onManage }) {
 
   function handleReject(req) {
     onReject(req);
+    setSelected(null);
+  }
+
+  function handleRevert(req) {
+    onRevert(req);
     setSelected(null);
   }
 
@@ -302,9 +366,11 @@ export function TabAdmin({ requests, queue, onApprove, onReject, onManage }) {
                 isSelected={selected?.id === req.id}
                 isDimmed={!!selected && selected.id !== req.id}
                 isPending={sub === 'pending'}
+                canRevert={canRevertStatus(req.status)}
                 onClick={() => handleSelectCard(req)}
                 onApprove={handleApprove}
                 onReject={handleReject}
+                onRevert={handleRevert}
               />
             ))}
           </div>
@@ -318,9 +384,11 @@ export function TabAdmin({ requests, queue, onApprove, onReject, onManage }) {
           <DetailPanel
             req={selected}
             isQueued={queuedIds.has(selected.id)}
+            canRevert={canRevertStatus(selected.status)}
             onClose={() => setSelected(null)}
             onApprove={handleApprove}
             onReject={handleReject}
+            onRevert={handleRevert}
           />
         </>
       )}
