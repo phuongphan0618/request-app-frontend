@@ -7,7 +7,6 @@ import {
   getUsers, createUser, updateUser, deleteUser,
   getApplications, createApplication, updateApplication, deleteApplication, getOwners,
 } from '../../lib/api';
-import { useToasts } from './helpers';
 
 const PAGE_SIZE = 8;
 
@@ -131,8 +130,7 @@ function AppFormFields({ appForm, setAppForm, domains, owners, isSubmitting, sho
   );
 }
 
-function AppTable() {
-  const { push: pushToast } = useToasts();
+export function AppTable({ pushToast }) {
   const [apps, setApps]               = useState([]);
   const [domains, setDomains]         = useState([]);
   const [owners, setOwners]           = useState([]);
@@ -448,8 +446,7 @@ function DomainFormFields({ domainForm, setDomainForm, departments, subadmins, i
   );
 }
 
-function DomainTable() {
-  const { push: pushToast } = useToasts();
+export function DomainTable({ pushToast }) {
   const [domains, setDomains]                   = useState([]);
   const [departments, setDepartments]           = useState([]);
   const [subadmins, setSubadmins]               = useState([]);
@@ -712,8 +709,7 @@ function rolesFromUser(u) {
   return roles;
 }
 
-function UserTable() {
-  const { push: pushToast } = useToasts();
+export function UserTable({ pushToast }) {
   const [users, setUsers]                 = useState([]);
   const [loading, setLoading]             = useState(true);
   const [isSubmitting, setIsSubmitting]   = useState(false);
@@ -722,6 +718,7 @@ function UserTable() {
   const [userForm, setUserForm]           = useState(EMPTY_USER_FORM);
   const [editUserTarget, setEditUserTarget] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [showPw, setShowPw]               = useState(false);
 
   async function loadUsers() {
     try {
@@ -775,9 +772,8 @@ function UserTable() {
         is_owner: userForm.roles.includes('owner'),
       });
       pushToast(`Đã tạo user ${userForm.email} thành công`, 'success', '✓');
-      await loadUsers();
-      setUserForm(EMPTY_USER_FORM);
       setModal(null);
+      await loadUsers();
     } catch (err) {
       console.error('Lỗi tạo user:', err);
       pushToast(err.message || 'Không thể tạo user', 'error', '✕');
@@ -837,7 +833,7 @@ function UserTable() {
           </div>
           <span className={styles.mgmtCount}>{filtered.length} người dùng</span>
         </div>
-        <button className={styles.mgmtAddBtn} onClick={() => { setUserForm(EMPTY_USER_FORM); setModal('addUser'); }}>
+        <button className={styles.mgmtAddBtn} onClick={() => { setUserForm(EMPTY_USER_FORM); setShowPw(false); setModal('addUser'); }}>
           + Tạo user
         </button>
       </div>
@@ -870,10 +866,10 @@ function UserTable() {
                 <td>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                     {u.is_subadmin && (
-                      <span className={styles.mgmtBadge} style={{ background: 'rgba(222,26,26,0.11)', color: '#ff6b6b' }}>Admin</span>
+                      <span className={`${styles.mgmtBadge} ${styles.badgeAdmin}`}>Admin</span>
                     )}
                     {u.is_owner && (
-                      <span className={styles.mgmtBadge} style={{ background: 'rgba(46,204,113,0.12)', color: '#2ecc71' }}>Owner</span>
+                      <span className={`${styles.mgmtBadge} ${styles.badgeOwner}`}>Owner</span>
                     )}
                   </div>
                 </td>
@@ -933,8 +929,17 @@ function UserTable() {
               </div>
               <div className={styles.formGroup}>
                 <label className={styles.formLabel}>Mật khẩu <span className={styles.required}>*</span></label>
-                <input className={styles.formInput} type="password" placeholder="Tối thiểu 8 ký tự" required
-                  value={userForm.password} onChange={e => setUserForm(p => ({ ...p, password: e.target.value }))} disabled={isSubmitting} />
+                <div className={styles.settingsInputWrap}>
+                  <input className={styles.formInput} type={showPw ? 'text' : 'password'} placeholder="Tối thiểu 8 ký tự" required
+                    value={userForm.password} onChange={e => setUserForm(p => ({ ...p, password: e.target.value }))} disabled={isSubmitting}
+                    style={{ paddingRight: '2.2rem' }} />
+                  <button type="button" className={styles.settingsEye} onClick={() => setShowPw(p => !p)} tabIndex={-1}>
+                    {showPw
+                      ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                      : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    }
+                  </button>
+                </div>
               </div>
               <div className={styles.formGroup}>
                 <label className={styles.formLabel}>Vai trò <OptLabel /></label>

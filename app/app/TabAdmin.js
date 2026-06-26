@@ -78,17 +78,21 @@ function RequestCard({ req, isQueued, isSelected, isDimmed, onClick, onApprove, 
             onClick={e => { e.stopPropagation(); onReject(req); }}
           >✗</button>
         </div>
+      ) : canRevert ? (
+        <div className={styles.reqCardFooter}>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRight: '1px dashed var(--input-border)' }}>
+            <StatusBadge status={req.status} />
+          </div>
+          <button
+            className={`${styles.reqCardBtn} ${styles.reqCardBtnRevert}`}
+            style={{ flex: 1, fontSize: '0.8rem', fontWeight: 600 }}
+            title="Hoàn tác về chờ admin"
+            onClick={e => { e.stopPropagation(); onRevert(req); }}
+          >Hoàn tác</button>
+        </div>
       ) : (
-        <div className={styles.reqCardFooter} style={{ justifyContent: canRevert ? 'space-between' : 'center', alignItems: 'center' }}>
+        <div className={styles.reqCardFooter} style={{ justifyContent: 'center' }}>
           <StatusBadge status={req.status} />
-          {canRevert && (
-            <button
-              className={styles.btnSecondary}
-              style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 500 }}
-              title="Hoàn tác về chờ admin"
-              onClick={e => { e.stopPropagation(); onRevert(req); }}
-            >Hoàn tác</button>
-          )}
         </div>
       )}
     </div>

@@ -87,7 +87,7 @@
 }
 
 .brand {
-  font-size: 0.88rem;
+  font-size: 1.05rem;
   font-weight: 800;
   color: var(--color-red);
   letter-spacing: -0.3px;
@@ -154,14 +154,14 @@
   font-weight: 600;
 }
 
-.navItemActive.navRequester { border-color: rgba(139,133,193,0.3); }
-.navItemActive.navAdmin     { border-color: rgba(222,26,26,0.3); }
-.navItemActive.navOwner     { border-color: rgba(46,204,113,0.3); }
+.navItemActive.navRequester { border-color: rgba(122,111,155,0.45); }
+.navItemActive.navAdmin     { border-color: rgba(242,186,201,0.6); }
+.navItemActive.navOwner     { border-color: rgba(186,215,242,0.6); }
 
 .navDot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.dotRequester { background: var(--color-purple-mid); }
-.dotAdmin     { background: var(--color-red); }
-.dotOwner     { background: #2ecc71; }
+.dotRequester { background: #7A6F9B; }
+.dotAdmin     { background: #F2BAC9; }
+.dotOwner     { background: #BAD7F2; }
 
 .navLabel { flex: 1; }
 
@@ -173,9 +173,9 @@
   min-width: 18px;
   text-align: center;
 }
-.badgeRequester { background: rgba(139,133,193,0.18); color: var(--color-purple-mid); }
-.badgeAdmin     { background: rgba(222,26,26,0.15);   color: var(--color-red); }
-.badgeOwner     { background: rgba(46,204,113,0.15);  color: #2ecc71; }
+.badgeRequester { background: #7A6F9B; color: #fff; }
+.badgeAdmin     { background: #F2BAC9; color: #7a2a3a; }
+.badgeOwner     { background: #BAD7F2; color: #1a4a6e; }
 
 /* ── Sidebar Footer ── */
 .sidebarFooter {
@@ -697,7 +697,7 @@
 
 .cardGrid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
 }
 
@@ -738,7 +738,12 @@
 .reqCardIdWrap { display: flex; align-items: center; gap: 5px; min-width: 0; }
 
 .reqCardId {
-  font-size: 0.82rem; font-weight: 700; color: var(--text-primary);
+  display: inline-block;
+  padding: 3px 9px;
+  border: 1.5px solid var(--input-border);
+  border-radius: 6px;
+  background: var(--input-bg);
+  font-size: 0.82rem; font-weight: 800; color: var(--text-primary);
   white-space: nowrap; letter-spacing: 0.5px;
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
 }
@@ -759,10 +764,11 @@
 }
 
 .reqCardName  { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); }
-.reqCardEmail { font-size: 0.76rem; color: var(--text-secondary); overflow-wrap: break-word; word-break: break-all; }
+.reqCardEmail { font-size: 0.76rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .reqCardDeadlineRow {
   display: flex; border: 1.5px solid var(--input-border); border-radius: 6px; overflow: hidden;
+  flex-shrink: 0;
 }
 .reqCardDeadlineLabel {
   padding: 5px 9px; font-size: 0.65rem; color: var(--text-secondary); white-space: nowrap;
@@ -803,6 +809,8 @@
 .reqCardBtnApprove:disabled { opacity: 0.35; cursor: not-allowed; }
 .reqCardBtnReject { color: #ff6b6b; }
 .reqCardBtnReject:hover { background: rgba(222,26,26,0.1); }
+.reqCardBtnRevert { color: #f5a623; }
+.reqCardBtnRevert:hover { background: rgba(245,166,35,0.12); }
 
 /* ══════════════════════════════════════
    DETAIL PANEL (slide-in from right)
@@ -1080,7 +1088,7 @@
 }
 
 .modalBox {
-  background: var(--card-bg);
+  background: rgba(48, 46, 62, 0.96);
   backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
   border: 1px solid var(--input-border);
   border-radius: 16px;
@@ -1089,6 +1097,7 @@
   max-height: 90vh; overflow-y: auto;
   animation: modalIn 0.2s ease;
 }
+.lightTheme .modalBox { background: #ffffff; }
 
 @keyframes modalIn {
   from { opacity: 0; transform: translateY(-12px) scale(0.97); }
@@ -1159,8 +1168,8 @@
 
 .formSelect {
   padding: 0.55rem 0.8rem;
-  background: var(--input-bg);
-  border: 1px solid var(--input-border);
+  background: rgba(122, 111, 155, 0.14);
+  border: 1px solid rgba(212, 205, 244, 0.18);
   border-radius: 8px; outline: none;
   color: var(--text-primary); font-family: inherit;
   font-size: 0.83rem; cursor: pointer;
@@ -1213,8 +1222,8 @@
 .appItem {
   display: flex; align-items: center; gap: 8px;
   padding: 7px 9px; border-radius: 7px;
-  border: 1px solid var(--input-border);
-  background: var(--input-bg); cursor: pointer;
+  border: 1px solid rgba(212, 205, 244, 0.18);
+  background: rgba(122, 111, 155, 0.14); cursor: pointer;
   transition: all 0.15s; font-size: 0.78rem;
   color: var(--text-secondary);
 }
@@ -1232,8 +1241,8 @@
 
 .formTextarea {
   padding: 0.55rem 0.8rem;
-  background: var(--input-bg);
-  border: 1px solid var(--input-border);
+  background: rgba(122, 111, 155, 0.14);
+  border: 1px solid rgba(212, 205, 244, 0.18);
   border-radius: 8px; outline: none;
   color: var(--text-primary); font-family: inherit;
   font-size: 0.83rem; resize: vertical;
@@ -1244,15 +1253,21 @@
 
 .formDate {
   padding: 0.55rem 0.8rem;
-  background: var(--input-bg);
-  border: 1px solid var(--input-border);
+  background: rgba(122, 111, 155, 0.14);
+  border: 1px solid rgba(212, 205, 244, 0.18);
   border-radius: 8px; outline: none;
   color: var(--text-primary); font-family: inherit;
   font-size: 0.83rem; cursor: pointer;
   transition: border-color 0.15s;
   color-scheme: dark;
 }
-.lightTheme .formDate { color-scheme: light; }
+.lightTheme .formDate  { color-scheme: light; }
+.lightTheme .formSelect,
+.lightTheme .formInput,
+.lightTheme .formTextarea,
+.lightTheme .formDate,
+.lightTheme .appsPlaceholder,
+.lightTheme .appItem   { background: rgba(122, 111, 155, 0.07); border-color: rgba(122, 111, 155, 0.2); }
 .formDate:focus { border-color: var(--color-purple-mid); }
 
 .urgentCheck {
@@ -1536,7 +1551,12 @@
 }
 
 .reqSplitCardId {
-  font-size: 0.92rem; font-weight: 700;
+  display: inline-block;
+  padding: 3px 9px;
+  border: 1.5px solid var(--input-border);
+  border-radius: 6px;
+  background: var(--input-bg);
+  font-size: 0.82rem; font-weight: 800;
   color: var(--text-primary);
   letter-spacing: 0.5px;
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
@@ -1830,12 +1850,6 @@
 .cardActionBtns {
   display: flex; flex-direction: column;
   gap: 5px; flex-shrink: 0;
-  border-top: 1px solid var(--input-border);
-  border-left: 1px solid var(--input-border);
-  border-radius: 9px 0 0 0;
-  padding: 8px 10px;
-  margin-right: -13px;
-  margin-bottom: -12px;
   align-self: flex-end;
 }
 
@@ -1993,4 +2007,305 @@
 .ownerStatusRejected {
   background: rgba(222,26,26,0.1); color: var(--color-red);
   border: 1px solid rgba(222,26,26,0.25);
+}
+
+/* ── UserMenu ── */
+.userMenuWrap { position: relative; }
+
+.userMenuTrigger {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 6px 8px; border-radius: 8px;
+  border: none; background: transparent; cursor: pointer;
+  text-align: left; transition: background 0.15s;
+}
+.userMenuTrigger:hover { background: var(--input-bg); }
+
+.userMenuChevron {
+  flex-shrink: 0; color: var(--text-secondary);
+  transition: transform 0.2s;
+}
+.userMenuChevronUp { transform: rotate(180deg); }
+
+.userMenuPopover {
+  position: absolute; bottom: calc(100% + 6px); left: 0; right: 0;
+  background: var(--card-bg, #1e1e2e);
+  border: 1px solid var(--input-border);
+  border-radius: 9px; padding: 4px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+  z-index: 200;
+}
+
+.userMenuItem {
+  display: flex; align-items: center; gap: 9px;
+  width: 100%; padding: 8px 10px; border-radius: 6px;
+  border: none; background: transparent; cursor: pointer;
+  font-family: inherit; font-size: 0.78rem; font-weight: 500;
+  color: var(--text-primary); text-align: left; transition: background 0.13s;
+}
+.userMenuItem:hover { background: var(--input-bg); }
+.userMenuItemDanger { color: var(--color-red); }
+.userMenuItemDanger:hover { background: rgba(222,26,26,0.08); }
+
+.userMenuDivider { height: 1px; background: var(--input-border); margin: 3px 0; }
+
+/* ── Settings modal ── */
+.settingsOverlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,0.45);
+  display: flex; align-items: center; justify-content: center;
+}
+
+.settingsModal {
+  background: #1e1e2e;
+  border: 1px solid var(--input-border);
+  border-radius: 14px; width: 400px; max-width: 95vw;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.35);
+  overflow: hidden;
+}
+
+.lightTheme .settingsModal { background: #ffffff; }
+
+.settingsHeader {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid var(--input-border);
+}
+.settingsTitle { font-size: 0.95rem; font-weight: 700; color: var(--text-primary); }
+.settingsClose {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 6px;
+  border: none; background: transparent; cursor: pointer;
+  color: var(--text-secondary); transition: background 0.13s;
+}
+.settingsClose:hover { background: var(--input-bg); color: var(--text-primary); }
+
+.settingsForm { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+
+.settingsSection {
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.7px;
+  text-transform: uppercase; color: var(--text-secondary);
+}
+.settingsHint { font-size: 0.72rem; color: var(--text-secondary); margin-top: -6px; }
+
+.settingsRow { display: flex; gap: 10px; }
+
+.settingsField { display: flex; flex-direction: column; gap: 5px; flex: 1; }
+
+.settingsLabel { font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); }
+
+.settingsInput {
+  width: 100%; padding: 8px 10px;
+  background: var(--input-bg); border: 1px solid var(--input-border);
+  border-radius: 7px; color: var(--text-primary);
+  font-family: inherit; font-size: 0.82rem;
+  outline: none; transition: border-color 0.15s;
+}
+.settingsInput:focus { border-color: var(--color-red); }
+
+.settingsInputWrap { position: relative; display: flex; align-items: center; }
+.settingsInputWrap .settingsInput { padding-right: 2.2rem; }
+.settingsEye {
+  position: absolute; right: 8px;
+  display: flex; align-items: center; justify-content: center;
+  border: none; background: transparent; cursor: pointer;
+  color: var(--text-secondary); padding: 0;
+}
+.settingsEye:hover { color: var(--text-primary); }
+
+.settingsError   { font-size: 0.72rem; color: var(--color-red);   margin-top: 2px; }
+.settingsSuccess { font-size: 0.72rem; color: #2ecc71;            margin-top: 2px; }
+
+.settingsActions {
+  display: flex; gap: 8px; justify-content: flex-end;
+  padding-top: 8px; margin-top: 4px;
+  border-top: 1px solid var(--input-border);
+}
+.settingsCancelBtn {
+  padding: 7px 16px; border-radius: 7px;
+  border: 1px solid var(--input-border); background: transparent;
+  color: var(--text-secondary); font-family: inherit; font-size: 0.82rem;
+  cursor: pointer; transition: all 0.13s;
+}
+.settingsCancelBtn:hover { background: var(--input-bg); color: var(--text-primary); }
+.settingsSaveBtn {
+  padding: 7px 16px; border-radius: 7px;
+  border: none; background: var(--color-red);
+  color: #fff; font-family: inherit; font-size: 0.82rem;
+  font-weight: 600; cursor: pointer; transition: opacity 0.13s;
+}
+.settingsSaveBtn:hover { opacity: 0.88; }
+
+/* ══════════════════════════════════════
+   BATCH FULL CARD (Owner)
+══════════════════════════════════════ */
+
+.batchFullCard {
+  background: var(--card-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* ── Card header ── */
+.batchFullCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--input-border);
+}
+
+.batchFullCardLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.batchFullCardIdRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.batchFullCardId {
+  display: inline-block;
+  padding: 4px 12px;
+  border: 1.5px solid var(--input-border);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  color: var(--text-primary);
+  letter-spacing: 0.4px;
+  background: var(--input-bg);
+}
+
+.batchFullCardCountRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 2px;
+}
+.batchFullCardCountNum {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1;
+}
+.batchFullCardCountLabel {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  align-self: center;
+}
+
+.batchFullCardRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.batchFullCardDate {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+.batchFullCardDeadline {
+  font-size: 0.82rem;
+  color: var(--color-purple-mid);
+  font-weight: 500;
+}
+
+.batchFullCardBulkBtns {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+.batchFullCardBulkBtns button {
+  width: 72px;
+  text-align: center;
+  white-space: normal;
+  line-height: 1.25;
+}
+
+/* ── Items table ── */
+.batchItemTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.batchItemThead th {
+  padding: 7px 14px;
+  text-align: left;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--input-border);
+  background: rgba(0,0,0,0.04);
+}
+
+.batchItemRow {
+  border-bottom: 1px solid var(--input-border);
+  transition: background 0.12s;
+}
+.batchItemRow:last-child { border-bottom: none; }
+.batchItemRow:hover { background: var(--table-row-hover); }
+
+.batchItemNameCell {
+  padding: 11px 14px;
+  vertical-align: middle;
+}
+.batchItemAppName {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.94rem;
+}
+.batchItemRequester {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 3px;
+  font-size: 0.79rem;
+  color: var(--text-secondary);
+}
+
+.batchItemDeadlineInline {
+  font-size: 0.74rem;
+  color: var(--color-purple-mid);
+  margin-top: 2px;
+}
+.batchItemDeadlineCell {
+  padding: 11px 14px;
+  vertical-align: middle;
+  font-size: 0.82rem;
+  color: var(--color-purple-mid);
+  white-space: nowrap;
+}
+
+.batchItemActionCell {
+  padding: 11px 14px;
+  vertical-align: middle;
+  width: 136px;
+  box-sizing: border-box;
+}
+
+.batchItemBtns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  width: 100%;
+  align-items: stretch;
+}
+.batchItemBtns > * {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  white-space: nowrap;
 }

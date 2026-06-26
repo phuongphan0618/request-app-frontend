@@ -15,7 +15,7 @@ export function fmtDateTime(iso) {
 
 export function shortId(id) {
   if (!id) return '—';
-  return String(id).slice(0, 8);
+  return String(id).slice(0, 8).toUpperCase();
 }
 
 export function calcWait(iso) {
@@ -30,7 +30,7 @@ export const STATUS_LABEL = {
   pending_owner:     { label: 'Chờ owner',     cls: 'badgeProcessing' },
   completed:         { label: 'Hoàn thành',    cls: 'badgeApproved' },
   rejected_by_admin: { label: 'Bị từ chối',   cls: 'badgeRejected' },
-  approved:          { label: 'Đã duyệt',      cls: 'badgeApproved' },
+  approved:          { label: 'Chấp nhận',      cls: 'badgeApproved' },
   rejected_by_owner: { label: 'Owner từ chối', cls: 'badgeRejected' },
   cancelled:         { label: 'Đã hủy',        cls: 'badgeRejected' },
 };

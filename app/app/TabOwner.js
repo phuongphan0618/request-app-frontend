@@ -3,7 +3,10 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import styles from './App.module.css';
 import { fmtDate, shortId } from './helpers';
+import { ClockIcon } from './TabAdmin';
 import { getOwnerBatches, getOwnerBatch, approveOwnerItem, rejectOwnerItem, revertOwnerItem } from '../../lib/api';
+
+// ── Confirm modal ─────────────────────────────────────────────
 
 function ActionModal({ title, message, isReject, onConfirm, onCancel }) {
   const [reason, setReason] = useState('');
@@ -58,13 +61,8 @@ function ActionModal({ title, message, isReject, onConfirm, onCancel }) {
           <button
             onClick={() => onConfirm(reason)}
             className={styles.btnPrimary}
-            style={{
-              minWidth: 88,
-              ...(isReject ? {} : { background: '#22c55e', borderColor: '#22c55e' }),
-            }}
-          >
-            Xác nhận
-          </button>
+            style={{ minWidth: 88, ...(isReject ? {} : { background: '#22c55e', borderColor: '#22c55e' }) }}
+          >Xác nhận</button>
           <button className={styles.btnSecondary} onClick={onCancel} style={{ minWidth: 88 }}>Hủy</button>
         </div>
       </div>
@@ -77,10 +75,7 @@ function RevertReasonModal({ label, onConfirm, onCancel }) {
   const [error, setError]   = useState('');
 
   function submit() {
-    if (!reason.trim()) {
-      setError('Vui lòng nhập lý do hoàn tác.');
-      return;
-    }
+    if (!reason.trim()) { setError('Vui lòng nhập lý do hoàn tác.'); return; }
     onConfirm(reason.trim());
   }
 
@@ -116,18 +111,155 @@ function RevertReasonModal({ label, onConfirm, onCancel }) {
   );
 }
 
+// ── Batch Full Card ───────────────────────────────────────────
+
+function BatchFullCard({ batch, setModal, onApproveItem }) {
+  const items        = batch.items || [];
+  const pendingCount = items.filter(i => i.status === 'pending_owner').length;
+  const isUrgent     = batch.is_urgent || items.some(i => i.is_urgent);
+
+  const nearestDeadline = useMemo(() => {
+    const dates = items.map(i => i.deadline).filter(Boolean).map(d => new Date(d));
+    return dates.length ? new Date(Math.min(...dates)) : null;
+  }, [items]);
+
+  return (
+    <div className={styles.batchFullCard}>
+
+      {/* ── Header ── */}
+      <div className={styles.batchFullCardHeader}>
+        <div className={styles.batchFullCardLeft}>
+          <div className={styles.batchFullCardIdRow}>
+            <span className={styles.batchFullCardId}>{shortId(batch.id)}</span>
+            {isUrgent && <ClockIcon />}
+          </div>
+          <div className={styles.batchFullCardCountRow}>
+            <span className={styles.batchFullCardCountNum}>{items.length}</span>
+            <span className={styles.batchFullCardCountLabel}>ứng dụng</span>
+          </div>
+        </div>
+
+        <div className={styles.batchFullCardRight}>
+          <span className={styles.batchFullCardDate}>Gửi: {fmtDate(batch.sent_at)}</span>
+          <div className={styles.batchFullCardBulkBtns}>
+            {nearestDeadline && (
+              <div className={`${styles.reqCardDeadlineRow} ${isUrgent ? styles.reqCardDeadlineUrgent : ''}`} style={{ width: 'fit-content', alignSelf: 'flex-end' }}>
+                <span className={styles.reqCardDeadlineLabel}>Deadline</span>
+                <span className={styles.reqCardDeadlineVal}>{fmtDate(nearestDeadline)}</span>
+              </div>
+            )}
+            {pendingCount > 0 && (<>
+              <button
+                className={styles.ownerApproveBtn}
+                onClick={() => setModal({ type: 'approve-all', batchId: batch.id, pendingCount })}
+              >Chấp nhận tất cả</button>
+              <button
+                className={styles.ownerRejectBtn}
+                onClick={() => setModal({ type: 'reject-all', batchId: batch.id, pendingCount })}
+              >Từ chối tất cả</button>
+            </>)}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Items table ── */}
+      <table className={styles.batchItemTable}>
+        <colgroup>
+          <col />
+          <col style={{ width: 110 }} />
+          <col style={{ width: 136 }} />
+        </colgroup>
+        <thead>
+          <tr className={styles.batchItemThead}>
+            <th>Ứng dụng</th>
+            <th>Deadline</th>
+            <th style={{ textAlign: 'center' }}>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map(item => {
+            const isPending = item.status === 'pending_owner';
+            return (
+              <tr key={item.id} className={styles.batchItemRow}>
+                {/* App name + requester */}
+                <td className={styles.batchItemNameCell}>
+                  <div className={styles.batchItemAppName}>{item.application_name}</div>
+                  <div className={styles.batchItemRequester}>
+                    {item.requester_name
+                      ? <><span>{item.requester_name}</span><span>{item.requester_email || ''}</span></>
+                      : <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: '0.69rem' }}>
+                          #{shortId(item.access_request_id)}
+                        </span>
+                    }
+                  </div>
+                </td>
+
+                {/* Deadline */}
+                <td className={styles.batchItemDeadlineCell}>
+                  {item.deadline ? fmtDate(item.deadline) : '—'}
+                </td>
+
+                {/* Action */}
+                <td className={styles.batchItemActionCell}>
+                  {isPending ? (
+                    <div className={styles.batchItemBtns}>
+                      <button
+                        className={styles.ownerItemApproveBtn}
+                        onClick={() => onApproveItem(batch.id, item.id)}
+                        title="Duyệt"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8">
+                          <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                      </button>
+                      <button
+                        className={styles.ownerItemRejectBtn}
+                        onClick={() => setModal({ type: 'reject-item', batchId: batch.id, itemId: item.id, label: item.application_name })}
+                        title="Từ chối"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8">
+                          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className={styles.batchItemBtns}>
+                      <span className={`${styles.badge} ${item.status === 'approved' ? styles.badgeApproved : styles.badgeRejected}`}>
+                        {item.status === 'approved' ? 'Chấp nhận' : 'Từ chối'}
+                      </span>
+                      <button
+                        className={styles.btnSecondary}
+                        style={{ padding: '0.22rem 0.6rem', fontSize: '0.71rem' }}
+                        onClick={() => setModal({ type: 'revert-item', batchId: batch.id, itemId: item.id, label: item.application_name })}
+                      >Hoàn tác</button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Tab Owner ─────────────────────────────────────────────────
+
+const PAGE_SIZE = 2;
+
 export function TabOwner({ pushToast }) {
-  const [batches, setBatches]           = useState([]);
-  const [loading, setLoading]           = useState(true);
-  const [tab, setTab]                   = useState('pending');
-  const [search, setSearch]             = useState('');
-  const [sortAsc, setSortAsc]           = useState(true);
-  const [userExpanded, setUserExpanded] = useState(new Set());
-  const [userCollapsed, setUserCollapsed] = useState(new Set());
-  const [modal, setModal]               = useState(null);
+  const [batches, setBatches] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab]         = useState('pending');
+  const [search, setSearch]   = useState('');
+  const [sortAsc, setSortAsc] = useState(false);
+  const [sortBy, setSortBy]   = useState('sent_at');
+  const [page, setPage]       = useState(1);
+  const [modal, setModal]     = useState(null);
 
   const inFlightRef  = useRef(false);
-  const overridesRef = useRef(new Map()); // `${batchId}:${itemId}` -> { fields, expiresAt }
+  const overridesRef = useRef(new Map());
 
   function applyOverrides(list) {
     return list.map(b => ({
@@ -150,7 +282,7 @@ export function TabOwner({ pushToast }) {
     inFlightRef.current = true;
     try {
       if (isInitial) setLoading(true);
-      const list = await getOwnerBatches();
+      const list     = await getOwnerBatches();
       const detailed = await Promise.all((list || []).map(b => getOwnerBatch(b.id)));
       setBatches(applyOverrides(detailed));
     } catch (err) {
@@ -178,51 +310,41 @@ export function TabOwner({ pushToast }) {
 
   const sorted = useMemo(() =>
     [...batches].sort((a, b) => {
-      const d = new Date(a.sent_at) - new Date(b.sent_at);
-      return sortAsc ? d : -d;
+      let valA, valB;
+      if (sortBy === 'deadline') {
+        const deadlines = batch => (batch.items || []).map(i => i.deadline).filter(Boolean);
+        const dA = deadlines(a); const dB = deadlines(b);
+        valA = dA.length ? Math.min(...dA.map(d => new Date(d))) : Infinity;
+        valB = dB.length ? Math.min(...dB.map(d => new Date(d))) : Infinity;
+      } else {
+        valA = new Date(a.sent_at); valB = new Date(b.sent_at);
+      }
+      return sortAsc ? valA - valB : valB - valA;
     }),
-    [batches, sortAsc]
+    [batches, sortAsc, sortBy]
   );
 
-  function isBatchDone(batch) {
-    return (batch.items || []).every(i => i.status !== 'pending_owner');
+  function isBatchDone(b) {
+    return (b.items || []).every(i => i.status !== 'pending_owner');
   }
 
   const pendingBatches = sorted.filter(b => !isBatchDone(b));
-  const doneBatches    = sorted.filter(b => isBatchDone(b));
+  const doneBatches    = sorted.filter(b =>  isBatchDone(b));
   const tabBatches     = tab === 'pending' ? pendingBatches : doneBatches;
 
   const filtered = search.trim()
     ? tabBatches.filter(b => b.id.toLowerCase().includes(search.trim().toLowerCase()))
     : tabBatches;
 
-  const firstNonDoneId = pendingBatches[0]?.id;
-
-  function isExpanded(batch) {
-    if (userCollapsed.has(batch.id)) return false;
-    if (batch.id === firstNonDoneId) return true;
-    return userExpanded.has(batch.id);
-  }
-
-  function toggleExpand(id) {
-    const batch = filtered.find(b => b.id === id);
-    const currently = isExpanded(batch);
-    if (currently) {
-      setUserCollapsed(p => new Set([...p, id]));
-      setUserExpanded(p => { const n = new Set(p); n.delete(id); return n; });
-    } else {
-      setUserExpanded(p => new Set([...p, id]));
-      setUserCollapsed(p => { const n = new Set(p); n.delete(id); return n; });
-    }
-  }
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paged      = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   async function approveItem(batchId, itemId) {
     try {
       await approveOwnerItem(batchId, itemId);
-      setItemOverride(batchId, itemId, { status: 'approved', owner_note: 'Đã duyệt' });
+      setItemOverride(batchId, itemId, { status: 'approved', owner_note: 'Chấp nhận' });
     } catch (err) {
-      console.error('Lỗi duyệt item:', err);
-      pushToast?.(err.message || 'Không thể duyệt item', 'error', '✕');
+      pushToast?.(err.message || 'Không thể duyệt ứng dụng', 'error', '✕');
     }
   }
 
@@ -230,15 +352,12 @@ export function TabOwner({ pushToast }) {
     const { batchId } = modal;
     setModal(null);
     try {
-      const response = await revertOwnerItem(batchId, modal.itemId, reason);
-      // Nếu response không kèm đủ items (không khớp shape kỳ vọng), fetch lại chi tiết batch
-      // để đảm bảo state luôn có items hợp lệ — tránh crash khi response thiếu field.
+      const response     = await revertOwnerItem(batchId, modal.itemId, reason);
       const updatedBatch = Array.isArray(response?.items) ? response : await getOwnerBatch(batchId);
       setBatches(p => p.map(b => b.id === batchId ? updatedBatch : b));
-      pushToast?.('Đã hoàn tác item', 'info', '↩');
+      pushToast?.('Đã hoàn tác ứng dụng', 'info', '↩');
     } catch (err) {
-      console.error('Lỗi hoàn tác item:', err);
-      pushToast?.(err.message || 'Không thể hoàn tác item', 'error', '✕');
+      pushToast?.(err.message || 'Không thể hoàn tác ứng dụng', 'error', '✕');
     }
   }
 
@@ -250,27 +369,25 @@ export function TabOwner({ pushToast }) {
         await rejectOwnerItem(batchId, itemId, reason);
         setItemOverride(batchId, itemId, { status: 'rejected_by_owner', owner_note: reason || 'Từ chối' });
       } else if (type === 'approve-all') {
-        const batch = batches.find(b => b.id === batchId);
+        const batch        = batches.find(b => b.id === batchId);
         const pendingItems = (batch.items || []).filter(i => i.status === 'pending_owner');
         await Promise.all(pendingItems.map(i => approveOwnerItem(batchId, i.id)));
-        pendingItems.forEach(i => setItemOverride(batchId, i.id, { status: 'approved', owner_note: 'Đã duyệt' }));
+        pendingItems.forEach(i => setItemOverride(batchId, i.id, { status: 'approved', owner_note: 'Chấp nhận' }));
       } else if (type === 'reject-all') {
-        const batch = batches.find(b => b.id === batchId);
+        const batch        = batches.find(b => b.id === batchId);
         const pendingItems = (batch.items || []).filter(i => i.status === 'pending_owner');
         await Promise.all(pendingItems.map(i => rejectOwnerItem(batchId, i.id, reason)));
         pendingItems.forEach(i => setItemOverride(batchId, i.id, { status: 'rejected_by_owner', owner_note: reason || 'Từ chối' }));
       }
     } catch (err) {
-      console.error('Lỗi xử lý batch:', err);
       pushToast?.(err.message || 'Không thể xử lý batch', 'error', '✕');
     }
   }
 
   const isReject = modal?.type === 'reject-item' || modal?.type === 'reject-all';
-
   const modalMessage = !modal ? '' :
-    modal.type === 'approve-all' ? `Duyệt tất cả ${modal.pendingCount} item đang chờ trong ${shortId(modal.batchId)}?` :
-    modal.type === 'reject-all'  ? `Từ chối tất cả ${modal.pendingCount} item đang chờ trong ${shortId(modal.batchId)}?` :
+    modal.type === 'approve-all' ? `Chấp nhận tất cả ${modal.pendingCount} ứng dụng đang chờ trong ${shortId(modal.batchId)}?` :
+    modal.type === 'reject-all'  ? `Từ chối tất cả ${modal.pendingCount} ứng dụng đang chờ trong ${shortId(modal.batchId)}?` :
     `Từ chối quyền truy cập cho "${modal.label}"?`;
 
   if (loading) {
@@ -284,13 +401,8 @@ export function TabOwner({ pushToast }) {
   return (
     <div>
       {modal && modal.type === 'revert-item' && (
-        <RevertReasonModal
-          label={modal.label}
-          onConfirm={handleRevertConfirm}
-          onCancel={() => setModal(null)}
-        />
+        <RevertReasonModal label={modal.label} onConfirm={handleRevertConfirm} onCancel={() => setModal(null)} />
       )}
-
       {modal && modal.type !== 'revert-item' && (
         <ActionModal
           title={isReject ? 'Xác nhận từ chối' : 'Xác nhận duyệt'}
@@ -308,6 +420,7 @@ export function TabOwner({ pushToast }) {
         </div>
       </div>
 
+      {/* Sub-tabs */}
       <div className={styles.subTabs}>
         {[
           { key: 'pending', label: 'Chưa xử lý', count: pendingBatches.length },
@@ -315,15 +428,15 @@ export function TabOwner({ pushToast }) {
         ].map(t => (
           <button key={t.key}
             className={`${styles.subTab} ${tab === t.key ? styles.subTabActive : ''}`}
-            onClick={() => { setTab(t.key); setSearch(''); }}
+            onClick={() => { setTab(t.key); setSearch(''); setPage(1); }}
           >
             {t.label}<span className={styles.subTabCount}>{t.count}</span>
           </button>
         ))}
       </div>
 
-      {/* Toolbar: search + sort */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center' }}>
+      {/* Toolbar */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1 }}>
           <svg style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', pointerEvents: 'none' }}
             width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -333,179 +446,73 @@ export function TabOwner({ pushToast }) {
             className={styles.mgmtSearch}
             placeholder="Tìm batch ID…"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
             style={{ paddingLeft: 30 }}
           />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: 8, padding: '3px 4px' }}>
+          {[{ key: 'sent_at', label: 'Ngày gửi' }, { key: 'deadline', label: 'Deadline' }].map(opt => (
+            <button
+              key={opt.key}
+              onClick={() => setSortBy(opt.key)}
+              style={{
+                padding: '4px 10px', fontSize: '0.78rem', fontWeight: 500, border: 'none', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap',
+                background: sortBy === opt.key ? 'var(--color-red)' : 'transparent',
+                color: sortBy === opt.key ? '#fff' : 'var(--text-secondary)',
+              }}
+            >{opt.label}</button>
+          ))}
         </div>
         <button
           className={styles.btnSecondary}
           onClick={() => setSortAsc(p => !p)}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', padding: '6px 12px' }}
+          title={sortAsc ? 'Tăng dần' : 'Giảm dần'}
+          style={{ display: 'flex', alignItems: 'center', padding: '6px 10px' }}
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-            style={{ transform: sortAsc ? 'none' : 'scaleY(-1)' }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+            style={{ transform: sortAsc ? 'none' : 'scaleY(-1)', transition: 'transform 0.15s' }}>
             <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="9" y2="18"/>
           </svg>
-          {sortAsc ? 'Lâu nhất → Sớm nhất' : 'Sớm nhất → Lâu nhất'}
         </button>
       </div>
 
-      {/* Accordion table */}
-      <div className={styles.mgmtTableWrap}>
-        <table className={styles.mgmtTable}>
-          <colgroup>
-            <col style={{ width: '35%' }} />     {/* col 1: Batch ID / App */}
-            <col style={{ width: '25%' }} />     {/* col 2: # items / App info */}
-            <col style={{ width: 110 }} />       {/* col 3: Date */}
-            <col style={{ width: 40 }} />        {/* col 4: Toggle */}
-            <col style={{ width: 116 }} />       {/* col 5: Approve */}
-            <col style={{ width: 116 }} />       {/* col 6: Reject */}
-          </colgroup>
-          <thead>
-            <tr>
-              <th>Batch ID</th>
-              <th></th>
-              <th>Ngày gửi</th>
-              <th></th>
-              <th colSpan={2} style={{ textAlign: 'center' }}>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr><td colSpan={6} className={styles.mgmtEmpty}>Không tìm thấy batch nào.</td></tr>
-            ) : filtered.map(batch => {
-              const expanded     = isExpanded(batch);
-              const items        = batch.items || [];
-              const pendingCount = items.filter(i => i.status === 'pending_owner').length;
+      {/* Batch cards */}
+      {filtered.length === 0 ? (
+        <div className={styles.emptyState}>
+          <div className={styles.emptyIcon}>📭</div>
+          Không tìm thấy batch nào.
+        </div>
+      ) : (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
+            {paged.map(batch => (
+              <BatchFullCard
+                key={batch.id}
+                batch={batch}
+                setModal={setModal}
+                onApproveItem={approveItem}
+              />
+            ))}
+          </div>
 
-              return (
-                <React.Fragment key={batch.id}>
-                  {/* ── Batch header row ── */}
-                  <tr className={styles.ownerBatchRow}>
-                    <td>
-                      <strong style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: '0.82rem' }}>
-                        {shortId(batch.id)}
-                      </strong>
-                    </td>
-                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-                      {items.length} item
-                    </td>
-                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
-                      {fmtDate(batch.sent_at)}
-                    </td>
-                    <td style={{ padding: '0.3rem 0.4rem' }}>
-                      <button
-                        onClick={() => toggleExpand(batch.id)}
-                        style={{
-                          background: 'transparent', border: 'none', cursor: 'pointer',
-                          color: 'var(--text-secondary)', padding: '3px 5px',
-                          display: 'flex', alignItems: 'center', borderRadius: 4,
-                        }}
-                        title={expanded ? 'Thu gọn' : 'Mở rộng'}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
-                          style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
-                          <polyline points="6 9 12 15 18 9"/>
-                        </svg>
-                      </button>
-                    </td>
-                    <td style={{ textAlign: 'center', padding: '0.4rem 0.5rem' }}>
-                      {pendingCount > 0 && (
-                        <button
-                          className={styles.ownerApproveBtn}
-                          style={{ width: '100%' }}
-                          onClick={() => setModal({ type: 'approve-all', batchId: batch.id, pendingCount })}
-                        >
-                          Approve all
-                        </button>
-                      )}
-                    </td>
-                    <td style={{ textAlign: 'center', padding: '0.4rem 0.5rem' }}>
-                      {pendingCount > 0 && (
-                        <button
-                          className={styles.ownerRejectBtn}
-                          style={{ width: '100%' }}
-                          onClick={() => setModal({ type: 'reject-all', batchId: batch.id, pendingCount })}
-                        >
-                          Reject all
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-
-                  {/* ── Item rows (when expanded) ── */}
-                  {expanded && items.map(item => {
-                    const isPending = item.status === 'pending_owner';
-                    return (
-                      <tr key={item.id} className={styles.ownerItemRow}>
-                        {/* Col 1: Application code / request id */}
-                        <td style={{ paddingLeft: 24 }}>
-                          <div style={{ lineHeight: 1.3 }}>
-                            <div style={{ fontSize: '0.83rem', fontWeight: 500 }}>{item.application_code}</div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Yêu cầu {shortId(item.access_request_id)}</div>
-                          </div>
-                        </td>
-                        {/* Col 2: App name + status badge */}
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                            <span style={{ fontWeight: 500, fontSize: '0.84rem' }}>{item.application_name}</span>
-                            {!isPending && (
-                              <span className={`${styles.ownerStatusBadge} ${item.status === 'approved' ? styles.ownerStatusApproved : styles.ownerStatusRejected}`}>
-                                {item.status === 'approved' ? 'Đã duyệt' : 'Từ chối'}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        {/* Col 3: date — empty */}
-                        <td></td>
-                        {/* Col 4: toggle — empty */}
-                        <td></td>
-                        {/* Col 5: Approve item button — centered */}
-                        <td style={{ textAlign: 'center', padding: '0.4rem 0.5rem' }}>
-                          {isPending ? (
-                            <button
-                              className={styles.ownerItemApproveBtn}
-                              onClick={() => approveItem(batch.id, item.id)}
-                              title="Duyệt"
-                            >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8">
-                                <polyline points="20 6 9 17 4 12"/>
-                              </svg>
-                            </button>
-                          ) : (
-                            <button
-                              className={styles.btnSecondary}
-                              style={{ padding: '0.3rem 0.7rem', fontSize: '0.75rem' }}
-                              onClick={() => setModal({ type: 'revert-item', batchId: batch.id, itemId: item.id, label: item.application_name })}
-                              title="Hoàn tác — đảo trạng thái duyệt/từ chối"
-                            >
-                              Hoàn tác
-                            </button>
-                          )}
-                        </td>
-                        {/* Col 6: Reject item button — centered */}
-                        <td style={{ textAlign: 'center', padding: '0.4rem 0.5rem' }}>
-                          {isPending && (
-                            <button
-                              className={styles.ownerItemRejectBtn}
-                              onClick={() => setModal({ type: 'reject-item', batchId: batch.id, itemId: item.id, label: item.application_name })}
-                              title="Từ chối"
-                            >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8">
-                                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                              </svg>
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </React.Fragment>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className={styles.pagination} style={{ marginTop: 16 }}>
+              <button
+                className={styles.pageBtn}
+                disabled={page === 1}
+                onClick={() => setPage(p => p - 1)}
+              >‹</button>
+              <span className={styles.pageInfo}>{page} / {totalPages}</span>
+              <button
+                className={styles.pageBtn}
+                disabled={page === totalPages}
+                onClick={() => setPage(p => p + 1)}
+              >›</button>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

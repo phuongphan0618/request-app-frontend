@@ -9,9 +9,9 @@ import styles from '../app/App.module.css';
 
 import { useToasts, ToastStack, shortId } from '../app/helpers';
 import { RejectReasonModal } from '../app/RejectReasonModal';
+import { UserMenu } from '../app/UserMenu';
 import { RevertReasonModal } from '../app/RevertReasonModal';
 import { TabAdmin } from '../app/TabAdmin';
-import { TabManage } from '../app/TabManage';
 import { BatchQueue } from '../app/BatchQueue';
 import { getAccessRequests, approveAccessRequest, rejectAccessRequest, revertAccessRequest, getBatches, sendBatch } from '../../lib/api';
 
@@ -27,7 +27,6 @@ export default function AdminPage() {
   const [approvingIds, setApprovingIds] = useState(new Set());
   const [rejectTarget, setRejectTarget] = useState(null);
   const [revertTarget, setRevertTarget] = useState(null);
-  const [adminView, setAdminView] = useState('requests'); // 'requests' | 'manage'
   const { toasts, push: pushToast } = useToasts();
 
   useEffect(() => {
@@ -251,25 +250,7 @@ export default function AdminPage() {
           </nav>
 
           <div className={styles.sidebarFooter}>
-            {user ? (
-              <div className={styles.userRow}>
-                <div className={styles.userAvatar}>
-                  {`${user.first_name?.charAt(0) || ''}${user.last_name?.charAt(0) || ''}`.toUpperCase()}
-                </div>
-                <div className={styles.userInfo}>
-                  <div className={styles.userName}>
-                    {`${user.first_name || ''} ${user.last_name || ''}`.trim()}
-                  </div>
-                  <div className={styles.userEmail}>{user.email || ''}</div>
-                </div>
-              </div>
-            ) : null}
-            <div className={styles.footerBtns}>
-              <button className={styles.footerBtn} onClick={() => router.push('/')}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                Đăng xuất
-              </button>
-            </div>
+            {user && <UserMenu user={user} onLogout={() => router.push('/')} onProfileUpdate={setUser} />}
           </div>
         </aside>
 
@@ -349,25 +330,7 @@ export default function AdminPage() {
         </nav>
 
         <div className={styles.sidebarFooter}>
-          {user ? (
-            <div className={styles.userRow}>
-              <div className={styles.userAvatar}>
-                {`${user.first_name?.charAt(0) || ''}${user.last_name?.charAt(0) || ''}`.toUpperCase()}
-              </div>
-              <div className={styles.userInfo}>
-                <div className={styles.userName}>
-                  {`${user.first_name || ''} ${user.last_name || ''}`.trim()}
-                </div>
-                <div className={styles.userEmail}>{user.email || ''}</div>
-              </div>
-            </div>
-          ) : null}
-          <div className={styles.footerBtns}>
-            <button className={styles.footerBtn} onClick={() => router.push('/')}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-              Đăng xuất
-            </button>
-          </div>
+          {user && <UserMenu user={user} onLogout={() => router.push('/')} onProfileUpdate={setUser} />}
         </div>
       </aside>
 
@@ -378,20 +341,16 @@ export default function AdminPage() {
             <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-gray)' }}>
               Đang tải dữ liệu...
             </div>
-          ) : adminView === 'manage' ? (
-            <TabManage onBack={() => setAdminView('requests')} />
           ) : (
-            <TabAdmin requests={allRequests} approvingIds={approvingIds} onApprove={handleAdminApprove} onReject={handleAdminReject} onRevert={handleAdminRevertOpen} onManage={() => setAdminView('manage')} />
+            <TabAdmin requests={allRequests} approvingIds={approvingIds} onApprove={handleAdminApprove} onReject={handleAdminReject} onRevert={handleAdminRevertOpen} onManage={() => router.push('/admin/manage')} />
           )}
         </div>
       </main>
 
-      {/* ── Right panel: batch queue (admin only) ── */}
-      {adminView !== 'manage' && (
-        <div className={styles.rightPanel}>
-          <BatchQueue batches={batches} onSendSelected={handleSendSelected} />
-        </div>
-      )}
+      {/* ── Right panel: batch queue ── */}
+      <div className={styles.rightPanel}>
+        <BatchQueue batches={batches} onSendSelected={handleSendSelected} />
+      </div>
     </div>
   );
 }
