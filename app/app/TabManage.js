@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from './App.module.css';
 import {
   getDomains, getDepartments, createDomain, updateDomain, deleteDomain, getSubadmins,
@@ -157,17 +157,44 @@ export function AppTable({ pushToast }) {
     }
   }
 
+  // Tự động cập nhật danh sách app mỗi 800ms, không cần refresh thủ công
+  const appInFlightRef = useRef(false);
   useEffect(() => {
-    loadApps();
+    let cancelled = false;
+
+    async function fetchApps(isInitial) {
+      if (appInFlightRef.current) return;
+      appInFlightRef.current = true;
+      try {
+        if (isInitial) setLoading(true);
+        const data = await getApplications();
+        if (!cancelled) setApps(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error('Lỗi tải app:', err);
+        if (isInitial) pushToast(err.message || 'Không thể tải danh sách app', 'error', '✕');
+      } finally {
+        if (isInitial) setLoading(false);
+        appInFlightRef.current = false;
+      }
+    }
+
+    fetchApps(true);
+    const interval = setInterval(() => fetchApps(false), 800);
+
     async function fetchDomains() {
       try {
         const data = await getDomains();
-        setDomains(Array.isArray(data) ? data : []);
+        if (!cancelled) setDomains(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error('Lỗi tải domain:', err);
       }
     }
     fetchDomains();
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
@@ -471,8 +498,34 @@ export function DomainTable({ pushToast }) {
     }
   }
 
+  // Tự động cập nhật danh sách domain mỗi 800ms, không cần refresh thủ công
+  const domainInFlightRef = useRef(false);
   useEffect(() => {
-    loadDomains();
+    let cancelled = false;
+
+    async function fetchDomains(isInitial) {
+      if (domainInFlightRef.current) return;
+      domainInFlightRef.current = true;
+      try {
+        if (isInitial) setLoading(true);
+        const data = await getDomains();
+        if (!cancelled) setDomains(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error('Lỗi tải domain:', err);
+        if (isInitial) pushToast(err.message || 'Không thể tải danh sách domain', 'error', '✕');
+      } finally {
+        if (isInitial) setLoading(false);
+        domainInFlightRef.current = false;
+      }
+    }
+
+    fetchDomains(true);
+    const interval = setInterval(() => fetchDomains(false), 800);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   // Fetch departments & subadmins when modal opens
@@ -733,8 +786,34 @@ export function UserTable({ pushToast }) {
     }
   }
 
+  // Tự động cập nhật danh sách user mỗi 800ms, không cần refresh thủ công
+  const userInFlightRef = useRef(false);
   useEffect(() => {
-    loadUsers();
+    let cancelled = false;
+
+    async function fetchUsers(isInitial) {
+      if (userInFlightRef.current) return;
+      userInFlightRef.current = true;
+      try {
+        if (isInitial) setLoading(true);
+        const data = await getUsers();
+        if (!cancelled) setUsers(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error('Lỗi tải user:', err);
+        if (isInitial) pushToast(err.message || 'Không thể tải danh sách user', 'error', '✕');
+      } finally {
+        if (isInitial) setLoading(false);
+        userInFlightRef.current = false;
+      }
+    }
+
+    fetchUsers(true);
+    const interval = setInterval(() => fetchUsers(false), 800);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   const filtered = search
