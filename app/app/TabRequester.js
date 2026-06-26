@@ -275,7 +275,10 @@ function ReqCard({ req, isSelected, onClick, compact, onCancel, onNudge, onDispu
               </>
             )}
             {isApproved && (
-              <button className={styles.cardBtnCancel} onClick={() => onCancel(req)}>Hủy</button>
+              <>
+                <button className={styles.cardBtnCancel} onClick={() => onCancel(req)}>Hủy</button>
+                <button className={styles.cardBtnNudge}  onClick={() => onNudge(req)}>Thúc!</button>
+              </>
             )}
             {isRejected && (
               <button className={styles.cardBtnDispute} onClick={() => onDispute(req)}>Khiếu nại</button>
