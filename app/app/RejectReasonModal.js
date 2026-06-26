@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import styles from './App.module.css';
+import { shortId } from './helpers';
 
 export function RejectReasonModal({ req, onCancel, onConfirm }) {
   const [reason, setReason] = useState('');
@@ -27,7 +28,7 @@ export function RejectReasonModal({ req, onCancel, onConfirm }) {
         <div className={styles.modalHeader}>
           <div>
             <h3 className={styles.modalTitle}>Từ chối yêu cầu</h3>
-            <p className={styles.modalSub}>{req.id} · {req.requester_name} · {req.requester_email}</p>
+            <p className={styles.modalSub}>{shortId(req.id)} · {req.requester_name} · {req.requester_email}</p>
           </div>
           <button className={styles.modalClose} onClick={onCancel}>✕</button>
         </div>

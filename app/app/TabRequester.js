@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import styles from './App.module.css';
 import { MOCK_USER, genId } from './data';
-import { fmtDate, fmtDateTime, StatusBadge, useToasts, ToastStack } from './helpers';
+import { fmtDate, fmtDateTime, StatusBadge, useToasts, ToastStack, shortId } from './helpers';
 import { ClockIcon } from './TabAdmin';
 import { getDepartments, getDomains, getApplications, createRequest, getMyRequest, cancelRequest, disputeRequest, remindRequest } from '../../lib/api';
 
@@ -117,7 +117,7 @@ function CancelModal({ req, reasonRequired, onConfirm, onClose }) {
     <div className={styles.modalBackdrop} onClick={onClose}>
       <div className={styles.modalBox} onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
         <div className={styles.modalHeader}>
-          <h3 className={styles.modalTitle}>Hủy yêu cầu {req.id}</h3>
+          <h3 className={styles.modalTitle}>Hủy yêu cầu {shortId(req.id)}</h3>
           <button className={styles.modalClose} onClick={onClose}>✕</button>
         </div>
         <form className={styles.modalForm} onSubmit={handleSubmit}>
@@ -152,7 +152,7 @@ function DisputeModal({ req, onConfirm, onClose }) {
     <div className={styles.modalBackdrop} onClick={onClose}>
       <div className={styles.modalBox} onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
         <div className={styles.modalHeader}>
-          <h3 className={styles.modalTitle}>Khiếu nại yêu cầu {req.id}</h3>
+          <h3 className={styles.modalTitle}>Khiếu nại yêu cầu {shortId(req.id)}</h3>
           <button className={styles.modalClose} onClick={onClose}>✕</button>
         </div>
         <div className={styles.modalForm}>
@@ -215,7 +215,7 @@ function ReqCard({ req, isSelected, onClick, compact, onCancel, onNudge, onDispu
       {/* Top row: ID | dates (overview) or badge (compact) */}
       <div className={styles.reqSplitCardTop}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span className={styles.reqSplitCardId}>{req.id}</span>
+          <span className={styles.reqSplitCardId}>{shortId(req.id)}</span>
           {req.is_urgent && <ClockIcon />}
         </div>
         {compact ? (
@@ -289,20 +289,24 @@ function ReqCard({ req, isSelected, onClick, compact, onCancel, onNudge, onDispu
 
 // ── Right detail pane ─────────────────────────────────────────
 
-function ReqDetail({ req, onCancel }) {
+function ReqDetail({ req, onCancel, onDispute }) {
   const canCancel = ['pending_admin', 'pending_owner'].includes(req.status);
+  const isRejected = req.status === 'rejected_by_admin';
   const rejectNote = req.review_note || req.reject_note;
 
   return (
     <div className={styles.reqDetailPane}>
       <div className={styles.rdHeader}>
         <div className={styles.rdHeaderLeft}>
-          <span className={styles.rdId}>{req.id}</span>
+          <span className={styles.rdId}>{shortId(req.id)}</span>
           {req.is_urgent && <ClockIcon />}
           <StatusBadge status={req.status} />
         </div>
         {canCancel && (
           <button className={styles.rdCancelBtn} onClick={() => onCancel(req)}>Hủy yêu cầu</button>
+        )}
+        {isRejected && (
+          <button className={styles.cardBtnDispute} onClick={() => onDispute(req)}>Khiếu nại</button>
         )}
       </div>
 
@@ -607,7 +611,7 @@ export function TabRequester({ myRequests, onCreate, onRefresh, onCancelSuccess 
   async function handleNudge(req) {
     try {
       await remindRequest(req.id);
-      push(`Đã gửi nhắc nhở đến admin cho yêu cầu ${req.id}`, 'success', '🔔');
+      push(`Đã gửi nhắc nhở đến admin cho yêu cầu ${shortId(req.id)}`, 'success', '🔔');
     } catch (err) {
       push(err.message || 'Không thể gửi nhắc nhở', 'error', '✕');
     }
@@ -618,7 +622,7 @@ export function TabRequester({ myRequests, onCreate, onRefresh, onCancelSuccess 
     try {
       const updated = await cancelRequest(target.id, reason);
       if (selected?.id === target.id) setSelected(null);
-      push(`Đã hủy yêu cầu ${target.id}`, 'info', '↩');
+      push(`Đã hủy yêu cầu ${shortId(target.id)}`, 'info', '↩');
       // Gọi callback cha để cập nhật state với dữ liệu mới nhất từ backend
       onCancelSuccess?.(target.id, updated);
     } catch (err) {
@@ -631,7 +635,7 @@ export function TabRequester({ myRequests, onCreate, onRefresh, onCancelSuccess 
   async function handleDisputeConfirm(reason) {
     try {
       await disputeRequest(disputeTarget.id, reason);
-      push(`Đã gửi khiếu nại cho yêu cầu ${disputeTarget.id}`, 'success', '📨');
+      push(`Đã gửi khiếu nại cho yêu cầu ${shortId(disputeTarget.id)}`, 'success', '📨');
       await onRefresh?.();
     } catch (err) {
       push(err.message || 'Không thể gửi khiếu nại', 'error', '✕');
@@ -731,6 +735,7 @@ export function TabRequester({ myRequests, onCreate, onRefresh, onCancelSuccess 
             key={selected.id}
             req={selectedDetail || selected}
             onCancel={r => setCancelTarget({ req: r, reasonRequired: r.status === 'pending_owner' })}
+            onDispute={r => setDisputeTarget(r)}
           />
         )}
       </div>

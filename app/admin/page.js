@@ -7,13 +7,13 @@ import { getCurrentUser } from '../../lib/api';
 import LoginBackground from '../../components/login/LoginBackground';
 import styles from '../app/App.module.css';
 
-import { useToasts, ToastStack } from '../app/helpers';
+import { useToasts, ToastStack, shortId } from '../app/helpers';
 import { RejectReasonModal } from '../app/RejectReasonModal';
 import { RevertReasonModal } from '../app/RevertReasonModal';
 import { TabAdmin } from '../app/TabAdmin';
 import { TabManage } from '../app/TabManage';
 import { BatchQueue } from '../app/BatchQueue';
-import { getAccessRequests, approveAccessRequest, rejectAccessRequest, revertAccessRequest } from '../../lib/api';
+import { getAccessRequests, approveAccessRequest, rejectAccessRequest, revertAccessRequest, getBatches, sendBatch } from '../../lib/api';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -22,8 +22,9 @@ export default function AdminPage() {
   const [user, setUser] = useState(null);
   const [hasAccess, setHasAccess] = useState(false);
   const [allRequests, setAllRequests] = useState([]);
+  const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [queue, setQueue] = useState([]);
+  const [approvingIds, setApprovingIds] = useState(new Set());
   const [rejectTarget, setRejectTarget] = useState(null);
   const [revertTarget, setRevertTarget] = useState(null);
   const [adminView, setAdminView] = useState('requests'); // 'requests' | 'manage'
@@ -50,8 +51,11 @@ export default function AdminPage() {
     }
   }, [router]);
 
-  // Tự động cập nhật danh sách requests, không cần người dùng chủ động refresh
+  // Tự động cập nhật danh sách requests, không cần người dùng chủ động refresh.
+  // overridesRef giữ tạm các thay đổi optimistic (duyệt/từ chối/hoàn tác) để polling
+  // không ghi đè ngược trạng thái nếu backend xử lý có độ trễ.
   const inFlightRef = useRef(false);
+  const requestOverridesRef = useRef(new Map());
 
   useEffect(() => {
     if (!hasAccess) return;
@@ -64,7 +68,16 @@ export default function AdminPage() {
       try {
         if (isInitial) setLoading(true);
         const requests = await getAccessRequests();
-        if (!cancelled) setAllRequests(requests || []);
+        const merged = (requests || []).map(r => {
+          const ov = requestOverridesRef.current.get(r.id);
+          if (!ov) return r;
+          if (Date.now() > ov.expiresAt || r.status === ov.fields.status) {
+            requestOverridesRef.current.delete(r.id);
+            return r;
+          }
+          return { ...r, ...ov.fields };
+        });
+        if (!cancelled) setAllRequests(merged);
       } catch (err) {
         console.error('Lỗi tải requests:', err);
         if (isInitial) pushToast('Không thể tải danh sách requests', 'error', '✕');
@@ -83,21 +96,65 @@ export default function AdminPage() {
     };
   }, [hasAccess, pushToast]);
 
+  // Batch được backend tự tạo khi request được duyệt (item tách theo owner) — chỉ cần poll danh sách
+  const batchInFlightRef = useRef(false);
+  const batchOverridesRef = useRef(new Map());
+
+  useEffect(() => {
+    if (!hasAccess) return;
+
+    let cancelled = false;
+
+    async function fetchBatches() {
+      if (batchInFlightRef.current) return;
+      batchInFlightRef.current = true;
+      try {
+        const data = await getBatches();
+        const merged = (data || []).map(b => {
+          const ov = batchOverridesRef.current.get(b.id);
+          if (!ov) return b;
+          if (Date.now() > ov.expiresAt || b.status === ov.fields.status) {
+            batchOverridesRef.current.delete(b.id);
+            return b;
+          }
+          return { ...b, ...ov.fields };
+        });
+        if (!cancelled) setBatches(merged);
+      } catch (err) {
+        console.error('Lỗi tải batches:', err);
+      } finally {
+        batchInFlightRef.current = false;
+      }
+    }
+
+    fetchBatches();
+    const interval = setInterval(fetchBatches, 800);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [hasAccess]);
+
   const pendingAdmin = allRequests.filter(r => r.status === 'pending_admin').length;
 
+  function setRequestOverride(reqId, fields) {
+    requestOverridesRef.current.set(reqId, { fields, expiresAt: Date.now() + 15000 });
+    setAllRequests(p => p.map(r => r.id === reqId ? { ...r, ...fields } : r));
+  }
+
   async function handleAdminApprove(req) {
+    setApprovingIds(p => new Set(p).add(req.id));
     try {
       await approveAccessRequest(req.id);
-      const newEntries = req.items
-        .filter(item => !queue.find(e => e.item.id === item.id))
-        .map(item => ({ request: req, item }));
-      if (newEntries.length > 0) setQueue(p => [...p, ...newEntries]);
-      setAllRequests(p => p.map(r => r.id === req.id ? { ...r, status: 'pending_owner' } : r));
-      const owners = [...new Set(req.items.map(i => i.owner_name))];
-      pushToast(`${req.id} → ${newEntries.length} item vào ${owners.length} batch`, 'success', '✓');
+      setRequestOverride(req.id, { status: 'pending_owner' });
+      // Backend tự tách item theo owner và tạo batch — danh sách batch sẽ tự cập nhật qua polling
+      pushToast(`${shortId(req.id)} đã được duyệt, item sẽ vào batch theo owner`, 'success', '✓');
     } catch (err) {
       console.error('Lỗi duyệt request:', err);
       pushToast(err.message || 'Không thể duyệt yêu cầu', 'error', '✕');
+    } finally {
+      setApprovingIds(p => { const next = new Set(p); next.delete(req.id); return next; });
     }
   }
 
@@ -108,9 +165,9 @@ export default function AdminPage() {
   async function handleRejectConfirm(req, reason) {
     try {
       await rejectAccessRequest(req.id, reason);
-      setAllRequests(p => p.map(r => r.id === req.id ? { ...r, status: 'rejected_by_admin', review_note: reason } : r));
+      setRequestOverride(req.id, { status: 'rejected_by_admin', review_note: reason });
       setRejectTarget(null);
-      pushToast(`Đã từ chối ${req.id}`, 'info', '✕');
+      pushToast(`Đã từ chối ${shortId(req.id)}`, 'info', '✕');
     } catch (err) {
       console.error('Lỗi từ chối request:', err);
       pushToast(err.message || 'Không thể từ chối yêu cầu', 'error', '✕');
@@ -126,19 +183,13 @@ export default function AdminPage() {
       await revertAccessRequest(req.id, reason);
 
       if (req.status === 'rejected_by_admin') {
-        // Hoàn tác từ chối → coi như duyệt lại: chuyển chờ owner, tách item vào batch theo owner
-        const newEntries = req.items
-          .filter(item => !queue.find(e => e.item.id === item.id))
-          .map(item => ({ request: req, item }));
-        if (newEntries.length > 0) setQueue(p => [...p, ...newEntries]);
-        setAllRequests(p => p.map(r => r.id === req.id ? { ...r, status: 'pending_owner', review_note: null } : r));
-        const owners = [...new Set(req.items.map(i => i.owner_name))];
-        pushToast(`Đã hoàn tác ${req.id} → ${newEntries.length} item vào ${owners.length} batch`, 'info', '↩');
+        // Hoàn tác từ chối → coi như duyệt lại: chuyển chờ owner, backend tự tách item vào batch theo owner
+        setRequestOverride(req.id, { status: 'pending_owner', review_note: null });
+        pushToast(`Đã hoàn tác ${shortId(req.id)} → chuyển chờ owner`, 'info', '↩');
       } else {
-        // Hoàn tác duyệt (pending_owner/completed) → coi như từ chối: chuyển đã xử lý, rút item khỏi batch
-        setQueue(p => p.filter(e => e.request.id !== req.id));
-        setAllRequests(p => p.map(r => r.id === req.id ? { ...r, status: 'rejected_by_admin', review_note: reason } : r));
-        pushToast(`Đã hoàn tác ${req.id} → chuyển sang bị từ chối`, 'info', '↩');
+        // Hoàn tác duyệt (pending_owner/completed) → coi như từ chối: chuyển đã xử lý
+        setRequestOverride(req.id, { status: 'rejected_by_admin', review_note: reason });
+        pushToast(`Đã hoàn tác ${shortId(req.id)} → chuyển sang bị từ chối`, 'info', '↩');
       }
 
       setRevertTarget(null);
@@ -148,15 +199,18 @@ export default function AdminPage() {
     }
   }
 
-  function handleRemoveItem(requestId, itemId) {
-    setQueue(p => p.filter(e => !(e.request.id === requestId && e.item.id === itemId)));
-    pushToast('Đã xoá item khỏi batch', 'info', '↩');
-  }
-
-  function handleSendSelected(selectedGroups) {
-    const ownerEmails = new Set(selectedGroups.map(g => g.owner_email));
-    setQueue(p => p.filter(e => !ownerEmails.has(e.item.owner_email)));
-    pushToast(`Đã gửi ${selectedGroups.length} batch đến ${selectedGroups.length} owner`, 'success', '📨');
+  async function handleSendSelected(selectedBatches) {
+    try {
+      await Promise.all(selectedBatches.map(b => sendBatch(b.id)));
+      selectedBatches.forEach(b => {
+        batchOverridesRef.current.set(b.id, { fields: { status: 'sent' }, expiresAt: Date.now() + 15000 });
+      });
+      setBatches(p => p.map(b => selectedBatches.some(sb => sb.id === b.id) ? { ...b, status: 'sent' } : b));
+      pushToast(`Đã gửi ${selectedBatches.length} batch đến ${selectedBatches.length} owner`, 'success', '📨');
+    } catch (err) {
+      console.error('Lỗi gửi batch:', err);
+      pushToast(err.message || 'Không thể gửi batch', 'error', '✕');
+    }
   }
 
   if (!user) {
@@ -327,7 +381,7 @@ export default function AdminPage() {
           ) : adminView === 'manage' ? (
             <TabManage onBack={() => setAdminView('requests')} />
           ) : (
-            <TabAdmin requests={allRequests} queue={queue} onApprove={handleAdminApprove} onReject={handleAdminReject} onRevert={handleAdminRevertOpen} onManage={() => setAdminView('manage')} />
+            <TabAdmin requests={allRequests} approvingIds={approvingIds} onApprove={handleAdminApprove} onReject={handleAdminReject} onRevert={handleAdminRevertOpen} onManage={() => setAdminView('manage')} />
           )}
         </div>
       </main>
@@ -335,7 +389,7 @@ export default function AdminPage() {
       {/* ── Right panel: batch queue (admin only) ── */}
       {adminView !== 'manage' && (
         <div className={styles.rightPanel}>
-          <BatchQueue queue={queue} onRemoveItem={handleRemoveItem} onSendSelected={handleSendSelected} />
+          <BatchQueue batches={batches} onSendSelected={handleSendSelected} />
         </div>
       )}
     </div>

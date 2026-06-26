@@ -182,7 +182,7 @@ export default function OwnerPage() {
       {/* ── Main content ── */}
       <main className={styles.main}>
         <div className={styles.mainContent}>
-          <TabOwner />
+          <TabOwner pushToast={pushToast} />
         </div>
       </main>
     </div>

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import styles from './App.module.css';
-import { fmtDate, fmtDateTime, calcWait, StatusBadge } from './helpers';
+import { fmtDate, fmtDateTime, calcWait, StatusBadge, shortId } from './helpers';
 import { getAccessRequest } from '../../lib/api';
 
 // ── Shared icons ─────────────────────────────────────────────
@@ -31,7 +31,7 @@ function RequestCard({ req, isQueued, isSelected, isDimmed, onClick, onApprove, 
       onClick={onClick}
     >
       <div className={styles.reqCardTop}>
-        <span className={styles.reqCardId}>{req.id}</span>
+        <span className={styles.reqCardId}>{shortId(req.id)}</span>
         <span className={styles.reqCardDate}>{fmtDate(req.created_at)}</span>
       </div>
 
@@ -128,7 +128,7 @@ function DetailPanel({ req, isQueued, onClose, onApprove, onReject, onRevert, ca
       {/* Header */}
       <div className={styles.dpHeader}>
         <div className={styles.dpHeaderLeft}>
-          <span className={styles.dpId}>{req.id}</span>
+          <span className={styles.dpId}>{shortId(req.id)}</span>
           {req.is_urgent && <ClockIcon />}
         </div>
         <button className={styles.dpClose} onClick={onClose}>✕</button>
@@ -274,13 +274,12 @@ function canRevertStatus(status) {
   return status === 'pending_owner' || status === 'completed' || status === 'rejected_by_admin';
 }
 
-export function TabAdmin({ requests, queue, onApprove, onReject, onRevert, onManage }) {
+export function TabAdmin({ requests, approvingIds, onApprove, onReject, onRevert, onManage }) {
   const [sub, setSub]           = useState('pending');
   const [search, setSearch]     = useState('');
   const [selected, setSelected] = useState(null);
   const [page, setPage]         = useState(1);
 
-  const queuedIds = new Set(queue.map(e => e.request.id));
   const byTab     = Object.fromEntries(SUB_TABS.map(t => [t.key, requests.filter(t.filter)]));
 
   const searchLow = search.toLowerCase().trim();
@@ -362,7 +361,7 @@ export function TabAdmin({ requests, queue, onApprove, onReject, onRevert, onMan
               <RequestCard
                 key={req.id}
                 req={req}
-                isQueued={queuedIds.has(req.id)}
+                isQueued={approvingIds.has(req.id)}
                 isSelected={selected?.id === req.id}
                 isDimmed={!!selected && selected.id !== req.id}
                 isPending={sub === 'pending'}
@@ -383,7 +382,7 @@ export function TabAdmin({ requests, queue, onApprove, onReject, onRevert, onMan
           <div className={styles.dpOverlay} onClick={() => setSelected(null)} />
           <DetailPanel
             req={selected}
-            isQueued={queuedIds.has(selected.id)}
+            isQueued={approvingIds.has(selected.id)}
             canRevert={canRevertStatus(selected.status)}
             onClose={() => setSelected(null)}
             onApprove={handleApprove}

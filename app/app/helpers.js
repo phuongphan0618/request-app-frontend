@@ -13,6 +13,11 @@ export function fmtDateTime(iso) {
   return new Date(iso).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+export function shortId(id) {
+  if (!id) return '—';
+  return String(id).slice(0, 8);
+}
+
 export function calcWait(iso) {
   const h = Math.floor((Date.now() - new Date(iso)) / 3600000);
   if (h < 1) return 'Vừa gửi';
@@ -35,15 +40,6 @@ export function StatusBadge({ status }) {
   return <span className={`${styles.badge} ${styles[info.cls]}`}>{info.label}</span>;
 }
 
-export function groupByOwner(queue) {
-  const map = {};
-  for (const entry of queue) {
-    const key = entry.item.owner_email;
-    if (!map[key]) map[key] = { owner_name: entry.item.owner_name, owner_email: key, entries: [] };
-    map[key].entries.push(entry);
-  }
-  return Object.values(map);
-}
 
 let _toastId = 0;
 

@@ -1,18 +1,9 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import styles from './App.module.css';
-import { MOCK_OWNER_BATCHES } from './data';
-import { fmtDate } from './helpers';
-
-function ClockIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-red)" strokeWidth="2.2"
-      style={{ flexShrink: 0, display: 'inline-block', verticalAlign: 'middle', marginLeft: 5 }}>
-      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-    </svg>
-  );
-}
+import { fmtDate, shortId } from './helpers';
+import { getOwnerBatches, getOwnerBatch, approveOwnerItem, rejectOwnerItem, revertOwnerItem } from '../../lib/api';
 
 function ActionModal({ title, message, isReject, onConfirm, onCancel }) {
   const [reason, setReason] = useState('');
@@ -81,14 +72,109 @@ function ActionModal({ title, message, isReject, onConfirm, onCancel }) {
   );
 }
 
-export function TabOwner() {
-  const [batches, setBatches]           = useState(MOCK_OWNER_BATCHES);
+function RevertReasonModal({ label, onConfirm, onCancel }) {
+  const [reason, setReason] = useState('');
+  const [error, setError]   = useState('');
+
+  function submit() {
+    if (!reason.trim()) {
+      setError('Vui lòng nhập lý do hoàn tác.');
+      return;
+    }
+    onConfirm(reason.trim());
+  }
+
+  return (
+    <div className={styles.modalBackdrop} onClick={onCancel}>
+      <div className={styles.modalBox} onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
+        <div className={styles.modalHeader}>
+          <h3 className={styles.modalTitle}>Hoàn tác "{label}"</h3>
+          <button className={styles.modalClose} onClick={onCancel}>✕</button>
+        </div>
+        <div className={styles.modalForm}>
+          {error && <div className={styles.modalError}>{error}</div>}
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel}>
+              Lý do hoàn tác <span className={styles.required}>*</span>
+            </label>
+            <textarea
+              className={styles.formInput}
+              rows={3}
+              placeholder="Nhập lý do hoàn tác…"
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              style={{ resize: 'none', width: '100%', boxSizing: 'border-box' }}
+            />
+          </div>
+          <div className={styles.modalActions}>
+            <button type="button" className={styles.btnPrimary} onClick={submit}>Xác nhận hoàn tác</button>
+            <button type="button" className={styles.btnSecondary} onClick={onCancel}>Hủy</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function TabOwner({ pushToast }) {
+  const [batches, setBatches]           = useState([]);
+  const [loading, setLoading]           = useState(true);
   const [tab, setTab]                   = useState('pending');
   const [search, setSearch]             = useState('');
   const [sortAsc, setSortAsc]           = useState(true);
   const [userExpanded, setUserExpanded] = useState(new Set());
   const [userCollapsed, setUserCollapsed] = useState(new Set());
   const [modal, setModal]               = useState(null);
+
+  const inFlightRef  = useRef(false);
+  const overridesRef = useRef(new Map()); // `${batchId}:${itemId}` -> { fields, expiresAt }
+
+  function applyOverrides(list) {
+    return list.map(b => ({
+      ...b,
+      items: (b.items || []).map(it => {
+        const key = `${b.id}:${it.id}`;
+        const ov  = overridesRef.current.get(key);
+        if (!ov) return it;
+        if (Date.now() > ov.expiresAt || it.status === ov.fields.status) {
+          overridesRef.current.delete(key);
+          return it;
+        }
+        return { ...it, ...ov.fields };
+      }),
+    }));
+  }
+
+  async function fetchBatches(isInitial) {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+    try {
+      if (isInitial) setLoading(true);
+      const list = await getOwnerBatches();
+      const detailed = await Promise.all((list || []).map(b => getOwnerBatch(b.id)));
+      setBatches(applyOverrides(detailed));
+    } catch (err) {
+      console.error('Lỗi tải batch:', err);
+      if (isInitial) pushToast?.('Không thể tải danh sách batch', 'error', '✕');
+    } finally {
+      if (isInitial) setLoading(false);
+      inFlightRef.current = false;
+    }
+  }
+
+  useEffect(() => {
+    fetchBatches(true);
+    const interval = setInterval(() => fetchBatches(false), 800);
+    return () => clearInterval(interval);
+  }, []);
+
+  function setItemOverride(batchId, itemId, fields) {
+    const key = `${batchId}:${itemId}`;
+    overridesRef.current.set(key, { fields, expiresAt: Date.now() + 15000 });
+    setBatches(p => p.map(b => b.id !== batchId ? b : {
+      ...b, items: b.items.map(i => i.id !== itemId ? i : { ...i, ...fields }),
+    }));
+  }
 
   const sorted = useMemo(() =>
     [...batches].sort((a, b) => {
@@ -99,7 +185,7 @@ export function TabOwner() {
   );
 
   function isBatchDone(batch) {
-    return batch.items.every(i => i.status !== 'pending_owner');
+    return (batch.items || []).every(i => i.status !== 'pending_owner');
   }
 
   const pendingBatches = sorted.filter(b => !isBatchDone(b));
@@ -130,40 +216,82 @@ export function TabOwner() {
     }
   }
 
-  function approveItem(batchId, itemId) {
-    setBatches(p => p.map(b => b.id !== batchId ? b : {
-      ...b, items: b.items.map(i => i.id !== itemId ? i : { ...i, status: 'approved', owner_note: 'Đã duyệt' }),
-    }));
+  async function approveItem(batchId, itemId) {
+    try {
+      await approveOwnerItem(batchId, itemId);
+      setItemOverride(batchId, itemId, { status: 'approved', owner_note: 'Đã duyệt' });
+    } catch (err) {
+      console.error('Lỗi duyệt item:', err);
+      pushToast?.(err.message || 'Không thể duyệt item', 'error', '✕');
+    }
   }
 
-  function handleConfirm(reason) {
-    const { type, batchId, itemId } = modal;
-    if (type === 'reject-item') {
-      setBatches(p => p.map(b => b.id !== batchId ? b : {
-        ...b, items: b.items.map(i => i.id !== itemId ? i : { ...i, status: 'rejected_by_owner', owner_note: reason || 'Từ chối' }),
-      }));
-    } else if (type === 'approve-all') {
-      setBatches(p => p.map(b => b.id !== batchId ? b : {
-        ...b, items: b.items.map(i => i.status === 'pending_owner' ? { ...i, status: 'approved', owner_note: 'Đã duyệt' } : i),
-      }));
-    } else if (type === 'reject-all') {
-      setBatches(p => p.map(b => b.id !== batchId ? b : {
-        ...b, items: b.items.map(i => i.status === 'pending_owner' ? { ...i, status: 'rejected_by_owner', owner_note: reason || 'Từ chối' } : i),
-      }));
-    }
+  async function handleRevertConfirm(reason) {
+    const { batchId } = modal;
     setModal(null);
+    try {
+      const response = await revertOwnerItem(batchId, modal.itemId, reason);
+      // Nếu response không kèm đủ items (không khớp shape kỳ vọng), fetch lại chi tiết batch
+      // để đảm bảo state luôn có items hợp lệ — tránh crash khi response thiếu field.
+      const updatedBatch = Array.isArray(response?.items) ? response : await getOwnerBatch(batchId);
+      setBatches(p => p.map(b => b.id === batchId ? updatedBatch : b));
+      pushToast?.('Đã hoàn tác item', 'info', '↩');
+    } catch (err) {
+      console.error('Lỗi hoàn tác item:', err);
+      pushToast?.(err.message || 'Không thể hoàn tác item', 'error', '✕');
+    }
+  }
+
+  async function handleConfirm(reason) {
+    const { type, batchId, itemId } = modal;
+    setModal(null);
+    try {
+      if (type === 'reject-item') {
+        await rejectOwnerItem(batchId, itemId, reason);
+        setItemOverride(batchId, itemId, { status: 'rejected_by_owner', owner_note: reason || 'Từ chối' });
+      } else if (type === 'approve-all') {
+        const batch = batches.find(b => b.id === batchId);
+        const pendingItems = (batch.items || []).filter(i => i.status === 'pending_owner');
+        await Promise.all(pendingItems.map(i => approveOwnerItem(batchId, i.id)));
+        pendingItems.forEach(i => setItemOverride(batchId, i.id, { status: 'approved', owner_note: 'Đã duyệt' }));
+      } else if (type === 'reject-all') {
+        const batch = batches.find(b => b.id === batchId);
+        const pendingItems = (batch.items || []).filter(i => i.status === 'pending_owner');
+        await Promise.all(pendingItems.map(i => rejectOwnerItem(batchId, i.id, reason)));
+        pendingItems.forEach(i => setItemOverride(batchId, i.id, { status: 'rejected_by_owner', owner_note: reason || 'Từ chối' }));
+      }
+    } catch (err) {
+      console.error('Lỗi xử lý batch:', err);
+      pushToast?.(err.message || 'Không thể xử lý batch', 'error', '✕');
+    }
   }
 
   const isReject = modal?.type === 'reject-item' || modal?.type === 'reject-all';
 
   const modalMessage = !modal ? '' :
-    modal.type === 'approve-all' ? `Duyệt tất cả ${modal.pendingCount} item đang chờ trong ${modal.batchId}?` :
-    modal.type === 'reject-all'  ? `Từ chối tất cả ${modal.pendingCount} item đang chờ trong ${modal.batchId}?` :
+    modal.type === 'approve-all' ? `Duyệt tất cả ${modal.pendingCount} item đang chờ trong ${shortId(modal.batchId)}?` :
+    modal.type === 'reject-all'  ? `Từ chối tất cả ${modal.pendingCount} item đang chờ trong ${shortId(modal.batchId)}?` :
     `Từ chối quyền truy cập cho "${modal.label}"?`;
+
+  if (loading) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-gray)' }}>
+        Đang tải dữ liệu...
+      </div>
+    );
+  }
 
   return (
     <div>
-      {modal && (
+      {modal && modal.type === 'revert-item' && (
+        <RevertReasonModal
+          label={modal.label}
+          onConfirm={handleRevertConfirm}
+          onCancel={() => setModal(null)}
+        />
+      )}
+
+      {modal && modal.type !== 'revert-item' && (
         <ActionModal
           title={isReject ? 'Xác nhận từ chối' : 'Xác nhận duyệt'}
           message={modalMessage}
@@ -227,7 +355,7 @@ export function TabOwner() {
         <table className={styles.mgmtTable}>
           <colgroup>
             <col style={{ width: '35%' }} />     {/* col 1: Batch ID / App */}
-            <col style={{ width: '25%' }} />     {/* col 2: # items / Requester */}
+            <col style={{ width: '25%' }} />     {/* col 2: # items / App info */}
             <col style={{ width: 110 }} />       {/* col 3: Date */}
             <col style={{ width: 40 }} />        {/* col 4: Toggle */}
             <col style={{ width: 116 }} />       {/* col 5: Approve */}
@@ -247,8 +375,8 @@ export function TabOwner() {
               <tr><td colSpan={6} className={styles.mgmtEmpty}>Không tìm thấy batch nào.</td></tr>
             ) : filtered.map(batch => {
               const expanded     = isExpanded(batch);
-              const hasUrgent    = batch.items.some(i => i.is_urgent);
-              const pendingCount = batch.items.filter(i => i.status === 'pending_owner').length;
+              const items        = batch.items || [];
+              const pendingCount = items.filter(i => i.status === 'pending_owner').length;
 
               return (
                 <React.Fragment key={batch.id}>
@@ -256,12 +384,11 @@ export function TabOwner() {
                   <tr className={styles.ownerBatchRow}>
                     <td>
                       <strong style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: '0.82rem' }}>
-                        {batch.id}
+                        {shortId(batch.id)}
                       </strong>
-                      {hasUrgent && <ClockIcon />}
                     </td>
                     <td style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-                      {batch.items.length} item
+                      {items.length} item
                     </td>
                     <td style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
                       {fmtDate(batch.sent_at)}
@@ -307,22 +434,21 @@ export function TabOwner() {
                   </tr>
 
                   {/* ── Item rows (when expanded) ── */}
-                  {expanded && batch.items.map(item => {
+                  {expanded && items.map(item => {
                     const isPending = item.status === 'pending_owner';
                     return (
                       <tr key={item.id} className={styles.ownerItemRow}>
-                        {/* Col 1: Requester name + email */}
+                        {/* Col 1: Application code / request id */}
                         <td style={{ paddingLeft: 24 }}>
                           <div style={{ lineHeight: 1.3 }}>
-                            <div style={{ fontSize: '0.83rem', fontWeight: 500 }}>{item.requester_name}</div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{item.requester_email}</div>
+                            <div style={{ fontSize: '0.83rem', fontWeight: 500 }}>{item.application_code}</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Yêu cầu {shortId(item.access_request_id)}</div>
                           </div>
                         </td>
-                        {/* Col 2: Domain chip + App name */}
+                        {/* Col 2: App name + status badge */}
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                             <span style={{ fontWeight: 500, fontSize: '0.84rem' }}>{item.application_name}</span>
-                            {item.is_urgent && <ClockIcon />}
                             {!isPending && (
                               <span className={`${styles.ownerStatusBadge} ${item.status === 'approved' ? styles.ownerStatusApproved : styles.ownerStatusRejected}`}>
                                 {item.status === 'approved' ? 'Đã duyệt' : 'Từ chối'}
@@ -336,7 +462,7 @@ export function TabOwner() {
                         <td></td>
                         {/* Col 5: Approve item button — centered */}
                         <td style={{ textAlign: 'center', padding: '0.4rem 0.5rem' }}>
-                          {isPending && (
+                          {isPending ? (
                             <button
                               className={styles.ownerItemApproveBtn}
                               onClick={() => approveItem(batch.id, item.id)}
@@ -345,6 +471,15 @@ export function TabOwner() {
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8">
                                 <polyline points="20 6 9 17 4 12"/>
                               </svg>
+                            </button>
+                          ) : (
+                            <button
+                              className={styles.btnSecondary}
+                              style={{ padding: '0.3rem 0.7rem', fontSize: '0.75rem' }}
+                              onClick={() => setModal({ type: 'revert-item', batchId: batch.id, itemId: item.id, label: item.application_name })}
+                              title="Hoàn tác — đảo trạng thái duyệt/từ chối"
+                            >
+                              Hoàn tác
                             </button>
                           )}
                         </td>
